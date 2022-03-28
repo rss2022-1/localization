@@ -73,15 +73,15 @@ class SensorModel:
         """
         p_hit_table = np.zeros((self.table_width, self.table_width))
         epsilon = .1
-        z_max = self.table_width - 1
+        z_max = self.table_width - 1.0
 
         # Loop through all z and d values and fill in lookup table
         for z in range(self.table_width):
             for d in range(self.table_width):
-                p_hit = 1/np.sqrt(2*np.pi*self.sigma_hit**2) * np.exp(-((z-d)**2)/(2*self.sigma_hit**2))
-                p_short = 2/d * (1-z/d) if z <= d else 0
-                p_max = 1/epsilon if (z >= z_max -.1 and z <= z_max) else 0
-                p_rand = 1/z_max if z <= z_max else 0
+                p_hit = 1.0/np.sqrt(2*np.pi*self.sigma_hit**2) * np.exp(-((z-d)**2)/(2*self.sigma_hit**2))
+                p_short = 2.0/d * (1-z/d) if (z <= d and d != 0) else 0.0
+                p_max = 1.0/epsilon if (z >= z_max -.1 and z <= z_max) else 0.0
+                p_rand = 1.0/z_max if z <= z_max else 0.0
                 
                 result_without_hit = self.alpha_short * p_short + self.alpha_max * p_max + self.alpha_random * p_rand
                 self.sensor_model_table[z][d] = result_without_hit
