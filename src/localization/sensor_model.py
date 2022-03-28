@@ -60,6 +60,7 @@ class SensorModel:
                 OccupancyGrid,
                 self.map_callback,
                 queue_size=1)
+        rospy.loginfo("Initialized sensor model")
 
     def precompute_sensor_model(self):
         """
@@ -86,9 +87,9 @@ class SensorModel:
         # Loop through all z and d values and fill in lookup table
         for z in range(self.table_width):
             for d in range(self.table_width):
-                p_hit = 1.0/np.sqrt(2*np.pi*self.sigma_hit**2) * np.exp(-((z-d)**2)/(2*self.sigma_hit**2))
-                p_short = 2.0/d * (1-z/d) if (z <= d and d != 0) else 0.0
-                p_max = 1.0/epsilon if (z >= self.z_max -.1 and z <= self.z_max) else 0.0
+                p_hit = 1.0/np.sqrt(2*np.pi*self.sigma_hit**2) * np.exp(-((float(z)-float(d))**2)/(2*self.sigma_hit**2))
+                p_short = 2.0/d * (1-float(z)/float(d)) if (z <= d and d != 0) else 0.0
+                p_max = float(z == self.z_max)
                 p_rand = 1.0/self.z_max if z <= self.z_max else 0.0
                 
                 result_without_hit = self.alpha_short * p_short + self.alpha_max * p_max + self.alpha_rand * p_rand
@@ -151,7 +152,7 @@ class SensorModel:
                 d = int(observation[j]) # ground truth
                 z = int(scan[j])
                 particle_probabilities[i] *= self.sensor_model_table[d][z]**(1.0/2.2)
-        
+
         return particle_probabilities
 
     def map_callback(self, map_msg):
