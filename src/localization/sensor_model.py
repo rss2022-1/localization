@@ -15,6 +15,7 @@ class SensorModel:
         self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
         self.scan_theta_discretization = rospy.get_param("~scan_theta_discretization")
         self.scan_field_of_view = rospy.get_param("~scan_field_of_view")
+        self.lidar_scale_to_map_scale = rospy.get_param("~lidar_scale_to_map_scale")
 
         ####################################
         # TODO
@@ -44,6 +45,7 @@ class SensorModel:
         # Subscribe to the map
         self.map = None
         self.map_set = False
+        self.map_resolution = 1.0
         rospy.Subscriber(
                 self.map_topic,
                 OccupancyGrid,
@@ -129,6 +131,10 @@ class SensorModel:
         # This produces a matrix of size N x num_beams_per_particle 
 
         scans = self.scan_sim.scan(particles)
+        scaled_scans = scans / (self.map_resolution*self.lidar_scale_to_map_scale)
+
+        z_max = self.table_width - 1
+        np.clip(scaled_scans, 0, z_max)
 
         ####################################
 
@@ -155,6 +161,9 @@ class SensorModel:
                 map_msg.info.resolution,
                 origin,
                 0.5) # Consider anything < 0.5 to be free
+        
+        # Add map resolution info
+        self.map_resoultion = map_msg.info.resolution
 
         # Make the map set
         self.map_set = True
