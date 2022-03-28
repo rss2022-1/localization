@@ -10,7 +10,7 @@ class MotionModel:
         # TODO
         # Do any precomputation for the motion
         # model here.
-        self.scale = 0
+        self.scale = .05
 
         ####################################
 
@@ -54,8 +54,8 @@ class MotionModel:
             particle_mx[1,2] = particle[1]
             particle_mx[2,2] = 1
             new_pos = np.dot(particle_mx, odometry_mx)
-            # res.append(np.array([new_pos[2,0] + self.noise(self.scale), new_pos[2,1] + self.noise(self.scale), np.arccos(new_pos[0,0]) + self.noise(self.scale)]))
-            res.append(np.array([new_pos[0,2], new_pos[0,1], np.arccos(new_pos[0,0])]))
+            res.append(np.array([new_pos[0,2] + self.noise(self.scale), new_pos[1,2] + self.noise(self.scale), np.arccos(new_pos[0,0]) + self.noise(self.scale)]))
+            # res.append(np.array([new_pos[0,2], new_pos[1,2], np.arccos(new_pos[0,0])]))
         return np.array(res)
 
         ####################################
