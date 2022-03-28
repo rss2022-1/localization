@@ -83,7 +83,7 @@ class SensorModel:
                 p_max = 1.0/epsilon if (z >= z_max -.1 and z <= z_max) else 0.0
                 p_rand = 1.0/z_max if z <= z_max else 0.0
                 
-                result_without_hit = self.alpha_short * p_short + self.alpha_max * p_max + self.alpha_random * p_rand
+                result_without_hit = self.alpha_short * p_short + self.alpha_max * p_max + self.alpha_rand * p_rand
                 self.sensor_model_table[z][d] = result_without_hit
                 p_hit_table[z][d] = p_hit
 
