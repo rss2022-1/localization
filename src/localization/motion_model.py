@@ -10,7 +10,7 @@ class MotionModel:
         # TODO
         # Do any precomputation for the motion
         # model here.
-        self.scale = .5
+        self.scale = 0
 
         ####################################
 
@@ -38,23 +38,24 @@ class MotionModel:
         res = []
         odometry_mx = np.zeros([3,3])
         odometry_mx[0,0] = np.cos(odometry[2])
-        odometry_mx[1,0] = -np.sin(odometry[2])
-        odometry_mx[0,1] = np.sin(odometry[2])
+        odometry_mx[0,1] = -np.sin(odometry[2])
+        odometry_mx[1,0] = np.sin(odometry[2])
         odometry_mx[1,1] = np.cos(odometry[2])
-        odometry_mx[2,0] = odometry[0]
-        odometry_mx[2,1] = odometry[1]
+        odometry_mx[0,2] = odometry[0]
+        odometry_mx[1,2] = odometry[1]
         odometry_mx[2,2] = 1
         for particle in particles:
             particle_mx = np.zeros([3,3])
             particle_mx[0,0] = np.cos(particle[2])
-            particle_mx[1,0] = -np.sin(particle[2])
-            particle_mx[0,1] = np.sin(particle[2])
+            particle_mx[0,1] = -np.sin(particle[2])
+            particle_mx[1,0] = np.sin(particle[2])
             particle_mx[1,1] = np.cos(particle[2])
-            particle_mx[2,0] = particle[0]
-            particle_mx[2,1] = particle[1]
+            particle_mx[0,2] = particle[0]
+            particle_mx[1,2] = particle[1]
             particle_mx[2,2] = 1
             new_pos = np.dot(particle_mx, odometry_mx)
-            res.append(np.array([new_pos[2,0] + self.noise(self.scale), new_pos[2,1] + self.noise(self.scale), np.arccos(new_pos[0,0]) + self.noise(self.scale)]))
+            # res.append(np.array([new_pos[2,0] + self.noise(self.scale), new_pos[2,1] + self.noise(self.scale), np.arccos(new_pos[0,0]) + self.noise(self.scale)]))
+            res.append(np.array([new_pos[0,2], new_pos[0,1], np.arccos(new_pos[0,0])]))
         return np.array(res)
 
         ####################################
