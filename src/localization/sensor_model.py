@@ -11,11 +11,12 @@ class SensorModel:
 
     def __init__(self):
         # Fetch parameters
-        self.map_topic = rospy.get_param("~map_topic", '/map')
+        self.map_topic = rospy.get_param("~map_topic", "/map")
         self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle", 100)
         self.scan_theta_discretization = rospy.get_param("~scan_theta_discretization", 500)
         self.scan_field_of_view = rospy.get_param("~scan_field_of_view", 4.71)
         self.lidar_scale_to_map_scale = rospy.get_param("~lidar_scale_to_map_scale", 1.0)
+        self.map_resolution = 1
 
         ####################################
         # TODO
@@ -34,14 +35,6 @@ class SensorModel:
         # Precompute the sensor model table
         self.sensor_model_table = np.zeros((self.table_width, self.table_width))
         self.precompute_sensor_model()
-
-        # Get params
-        self.map_resolution = 1
-        self.map_topic = rospy.get_param("~map_topic")
-        self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
-        self.scan_theta_discretization = rospy.get_param("~scan_theta_discretization")
-        self.scan_field_of_view = rospy.get_param("~scan_field_of_view")
-        self.lidar_scale_to_map_scale = rospy.get_param("~lidar_scale_to_map_scale")
 
         # Create a simulated laser scan
         self.scan_sim = PyScanSimulator2D(
@@ -88,8 +81,13 @@ class SensorModel:
         for z in range(self.table_width):
             for d in range(self.table_width):
                 p_hit = 1.0/np.sqrt(2*np.pi*self.sigma_hit**2) * np.exp(-((float(z)-float(d))**2)/(2*self.sigma_hit**2))
+<<<<<<< Updated upstream
                 p_short = 2.0/d * (1-float(z)/float(d)) if (z <= d and d != 0) else 0.0
                 p_max = float(z == self.z_max)
+=======
+                p_short = 2.0/float(d) * (1-float(z)/float(d)) if (float(z) <= float(d) and float(d) != 0.0) else 0.0
+                p_max = 1.0 if (z == self.z_max) else 0.0
+>>>>>>> Stashed changes
                 p_rand = 1.0/self.z_max if z <= self.z_max else 0.0
                 
                 result_without_hit = self.alpha_short * p_short + self.alpha_max * p_max + self.alpha_rand * p_rand
@@ -145,15 +143,21 @@ class SensorModel:
         observation = np.clip(observation, 0, self.z_max) # clip
 
         # Scan likelihood given by product of all likelihoods
-        particle_probabilities = np.ones(len(particles))
+        particle_likelihoods = np.ones(len(particles))
         for i in range(len(stacked_scans)):
             scan = stacked_scans[i]
-            for j in range(len(stacked_scans)):
+            for j in range(len(scan)):
                 d = int(observation[j]) # ground truth
                 z = int(scan[j])
+<<<<<<< Updated upstream
                 particle_probabilities[i] *= self.sensor_model_table[d][z]**(1.0/2.2)
 
         return particle_probabilities
+=======
+                particle_likelihoods[i] *= self.sensor_model_table[d][z]
+        
+        return particle_likelihoods**(1.0/2.2)
+>>>>>>> Stashed changes
 
     def map_callback(self, map_msg):
         # Convert the map to a numpy array
