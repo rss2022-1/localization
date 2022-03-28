@@ -37,21 +37,17 @@ class MotionModel:
         # TODO
         res = []
         x, y, theta = odometry
-        odometry_mx = np.array([[np.cos(theta), -np.sin(theta), x], 
-                                [np.sin(theta), np.cos(theta), y], 
+        odometry_mx = np.array([[np.cos(theta), -np.sin(theta), x],
+                                [np.sin(theta), np.cos(theta), y],
                                 [0, 0, 1]])
         for particle in particles:
             px, py, p_theta = particle
-            particle_mx = np.array([[np.cos(p_theta), -np.sin(p_theta), px], 
-                                [np.sin(p_theta), np.cos(p_theta), py], 
+            particle_mx = np.array([[np.cos(p_theta), -np.sin(p_theta), px],
+                                [np.sin(p_theta), np.cos(p_theta), py],
                                 [0, 0, 1]])
             new_pos = np.dot(particle_mx, odometry_mx)
-<<<<<<< HEAD
-            res.append(np.array([new_pos[0][2] + self.noise(self.scale), new_pos[1][2] + self.noise(self.scale), theta + self.noise(self.scale)]))
-=======
-            res.append(np.array([new_pos[0,2] + self.noise(self.scale), new_pos[1,2] + self.noise(self.scale), np.arccos(new_pos[0,0]) + self.noise(self.scale)]))
-            # res.append(np.array([new_pos[0,2], new_pos[1,2], np.arccos(new_pos[0,0])]))
->>>>>>> 36b3968dd6c2676fc943c3d66510a1054197f245
+            res.append(np.array([new_pos[0][2] + self.noise(self.scale), new_pos[1][2] + self.noise(self.scale), theta + particle[-1] + self.noise(self.scale)]))
+            # res.append(np.array([new_pos[0][2], new_pos[1][2], theta + particle[-1]]))
         return np.array(res)
 
         ####################################
