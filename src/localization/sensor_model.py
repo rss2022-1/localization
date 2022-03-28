@@ -34,6 +34,14 @@ class SensorModel:
         self.sensor_model_table = np.zeros((self.table_width, self.table_width))
         self.precompute_sensor_model()
 
+        # Get params
+        self.map_resolution = 1
+        self.map_topic = rospy.get_param("~map_topic")
+        self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
+        self.scan_theta_discretization = rospy.get_param("~scan_theta_discretization")
+        self.scan_field_of_view = rospy.get_param("~scan_field_of_view")
+        self.lidar_scale_to_map_scale = rospy.get_param("~lidar_scale_to_map_scale")
+
         # Create a simulated laser scan
         self.scan_sim = PyScanSimulator2D(
                 self.num_beams_per_particle,
@@ -122,21 +130,29 @@ class SensorModel:
         if not self.map_set:
             return
 
-        ####################################
-        # TODO
-        # Evaluate the sensor model here!
-        #
-        # You will probably want to use this function
-        # to perform ray tracing from all the particles.
-        # This produces a matrix of size N x num_beams_per_particle 
+        # Convert scan values from meters to pixels and clip values
+        stacked_scans = self.scan_sim.scan(particles)
+        stacked_scans /= float(self.map_resolution * self.lidar_scale_to_map_scale)
+        stacked_scans = np.rint(stacked_scans) # discretize
+        stacked_scans = stacked_scans.astype(np.uint16)
+        stacked_scans = np.clip(stacked_scans, 0, self.z_max) # clip
+        
+        # Convert ground truth scan values from meters to pixels and clip values
+        observation /= float(self.map_resolution * self.lidar_scale_to_map_scale)
+        observation = np.rint(observation) # discretize
+        observation = observation.astype(np.uint16)
+        observation = np.clip(observation, 0, self.z_max) # clip
 
-        scans = self.scan_sim.scan(particles)
-        scaled_scans = scans / (self.map_resolution*self.lidar_scale_to_map_scale)
-
-        z_max = self.table_width - 1
-        np.clip(scaled_scans, 0, z_max)
-
-        ####################################
+        # Scan likelihood given by product of all likelihoods
+        particle_probabilities = np.ones(len(particles))
+        for i in range(len(stacked_scans)):
+            scan = stacked_scans[i]
+            for j in range(len(stacked_scans)):
+                d = int(observation[j]) # ground truth
+                z = int(scan[j])
+                particle_probabilities[i] *= self.sensor_model_table[d][z]**(1.0/2.2)
+        
+        return particle_probabilities
 
     def map_callback(self, map_msg):
         # Convert the map to a numpy array
@@ -167,5 +183,6 @@ class SensorModel:
 
         # Make the map set
         self.map_set = True
+        self.map_resolution = map_msg.info.resolution
 
         print("Map initialized")
