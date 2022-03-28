@@ -11,11 +11,11 @@ class SensorModel:
 
     def __init__(self):
         # Fetch parameters
-        self.map_topic = rospy.get_param("~map_topic")
-        self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
-        self.scan_theta_discretization = rospy.get_param("~scan_theta_discretization")
-        self.scan_field_of_view = rospy.get_param("~scan_field_of_view")
-        self.lidar_scale_to_map_scale = rospy.get_param("~lidar_scale_to_map_scale")
+        self.map_topic = rospy.get_param("~map_topic", '/map')
+        self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle", 100)
+        self.scan_theta_discretization = rospy.get_param("~scan_theta_discretization", 500)
+        self.scan_field_of_view = rospy.get_param("~scan_field_of_view", 4.71)
+        self.lidar_scale_to_map_scale = rospy.get_param("~lidar_scale_to_map_scale", 1.0)
 
         ####################################
         # TODO
@@ -28,6 +28,7 @@ class SensorModel:
 
         # Your sensor table will be a `table_width` x `table_width` np array:
         self.table_width = 201
+        self.z_max = self.table_width - 1.0
         ####################################
 
         # Precompute the sensor model table
@@ -81,15 +82,14 @@ class SensorModel:
         """
         p_hit_table = np.zeros((self.table_width, self.table_width))
         epsilon = .1
-        z_max = self.table_width - 1.0
 
         # Loop through all z and d values and fill in lookup table
         for z in range(self.table_width):
             for d in range(self.table_width):
                 p_hit = 1.0/np.sqrt(2*np.pi*self.sigma_hit**2) * np.exp(-((z-d)**2)/(2*self.sigma_hit**2))
                 p_short = 2.0/d * (1-z/d) if (z <= d and d != 0) else 0.0
-                p_max = 1.0/epsilon if (z >= z_max -.1 and z <= z_max) else 0.0
-                p_rand = 1.0/z_max if z <= z_max else 0.0
+                p_max = 1.0/epsilon if (z >= self.z_max -.1 and z <= self.z_max) else 0.0
+                p_rand = 1.0/self.z_max if z <= self.z_max else 0.0
                 
                 result_without_hit = self.alpha_short * p_short + self.alpha_max * p_max + self.alpha_rand * p_rand
                 self.sensor_model_table[z][d] = result_without_hit
