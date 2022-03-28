@@ -25,4 +25,4 @@ particle_filter_frame: "/base_link_pf"
 deterministic: true
 
 # Used to scale data in sensor model from meters to pixels
-lidar_scale_to_map_scale: 1
+lidar_scale_to_map_scale: 1.0
