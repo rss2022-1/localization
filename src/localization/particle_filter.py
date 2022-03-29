@@ -156,18 +156,23 @@ class ParticleFilter:
     def publish_pose(self, avg_pose):
         """ Publish a transform between the map and the base_link frome of the given pose. """
         # Publish this "average" pose as a transform between the map and the car's expected base_link
-        new_pose = PoseWithCovarianceStamped()
-        new_pose.header.frame_id = "map"
-        new_pose.header.stamp = rospy.Time.now()
-        new_pose.pose.pose.position.x = avg_pose[0]
-        new_pose.pose.pose.position.y = avg_pose[1]
-        new_pose.pose.pose.position.z = 0
-        new_pose.pose.pose.orientation.w = 0
-        new_pose.pose.pose.orientation.x = 0
-        new_pose.pose.pose.orientation.y = 1
-        new_pose.pose.pose.orientation.z = avg_pose[2]
+        # new_pose.pose.pose.orientation.w = 0
+        # new_pose.pose.pose.orientation.x = 0
+        # new_pose.pose.pose.orientation.y = 1
+        # new_pose.pose.pose.orientation.z = avg_pose[2]
+        odom = Odometry()
+        odom.header.frame_id = "/map"
+        odom.header.stamp = rospy.Time.now()
+        odom.pose.pose.position.x = avg_pose[0]
+        odom.pose.pose.position.y = avg_pose[1]
+        odom.pose.pose.position.z = 0
+        odom.pose.pose.orientation.w = 0
+        odom.pose.pose.orientation.x = 0
+        odom.pose.pose.orientation.y = 1
+        odom.pose.pose.orientation.z = avg_pose[2]
+
         # create covariance matrix somehow
-        self.odom_pub.publish(new_pose)
+        self.odom_pub.publish(odom)
 
     def initialpose_callback(self, msg):
         """ Initialize particle positions based on an initial pose estimate. """
@@ -175,8 +180,8 @@ class ParticleFilter:
         y = msg.pose.pose.position.y
 
         base_noise = .5
-        self.particles[:, 0] = x + np.random.uniform(-base_noise, base_noise, self.num_particles)
-        self.particles[:, 1] = y + np.random.uniform(-base_noise, base_noise, self.num_particles)
+        self.particles[:, 0] = x + np.random.normal(0, base_noise, self.num_particles)
+        self.particles[:, 1] = y + np.random.normal(0, base_noise, self.num_particles)
         self.particles[:, 2] = np.random.uniform(-np.pi, np.pi, self.num_particles)
         self.last_update = time.time()
         self.initialized = True
