@@ -23,7 +23,7 @@ class ParticleFilter:
         # Setup
         self.lock = threading.Lock()
         self.num_particles = 100 # TODO: Initialize particles
-        self.particles = np.zeros((1, self.num_particles))
+        self.particles = None
         # Get parameters
         self.particle_filter_frame = \
                 rospy.get_param("~particle_filter_frame")
@@ -92,11 +92,14 @@ class ParticleFilter:
     def lidar_callback(self, msg):
         """ Compute particle likelihoods and resample particles. """
         # Takes in lidar data and calls sensor_model to get particle likelihoods
+        if not self.particles:
+            return
         ranges = np.array(msg.ranges)
         particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
 
         # Resample particles based on likelihoods
         num_particles = self.num_particles # TODO: Check to make sure this makes sense
+        rospy.loginfo(particle_likelihoods)
         sampled_particles = np.random.choice(self.particles, num_particles, p=particle_likelihoods)
         with self.lock:
             self.particles = sampled_particles
@@ -110,16 +113,19 @@ class ParticleFilter:
     def odom_callback(self, msg):
         """ Update particle positions based on odometry."""
         # Takes in odometry data then calls motion_model to update the particles
+        if not self.particles:
+            return
         # Twist gets us the Linear/Angular velocities
-        vx = msg.twist.linear.x
-        vy = msg.twist.linear.y
-        vtheta = msg.twist.angular.z
+        vx = msg.twist.twist.linear.x
+        vy = msg.twist.twist.linear.y
+        vtheta = msg.twist.twist.angular.z
 
         #   Use a Set dt to find dx, dy, and dtheta
         curr_time = time.time()
         dt = curr_time - self.last_update
         self.last_update = curr_time
         odom = np.array([vx*dt, vy*dt, vtheta*dt])
+        rospy.loginfo(self.particles)
         propogated_particles = self.motion_model.evaluate(self.particles, odom)
         with self.lock:
             self.particles = propogated_particles
