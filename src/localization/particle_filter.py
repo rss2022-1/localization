@@ -58,7 +58,7 @@ class ParticleFilter:
         self.cloud_topic = rospy.get_param("~cloud_topic", "cloud_map")
         self.estimation_topic = rospy.get_param("~estimation_topic", "/estim_marker")
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
-        self.particle_cloud_publisher = rospy.Publisher(self.cloud_topic, PointCloud, queue_size=10)
+        self.cloud_publisher = rospy.Publisher(self.cloud_topic, PointCloud, queue_size=10)
         self.estimation_publisher = rospy.Publisher(self.estimation_topic, Marker, queue_size=10)
 
         # Initialize the models
@@ -87,13 +87,13 @@ class ParticleFilter:
         # Use sin and cos to avoid circular mean problems
         poses = np.array([[x, y, np.sin(theta), np.cos(theta)] for x, y, theta in particles])
         clusters = DBSCAN(eps=0.5, min_samples=5).fit_predict(poses) # TODO: Tweak the eps and min_samples values based off our data
-        rospy.loginfo("Number of clusters: %d", len(set(clusters)))
-        rospy.loginfo("Clusters %s", set(clusters))
+        # rospy.loginfo("Number of clusters: %d", len(set(clusters)))
+        # rospy.loginfo("Clusters %s", set(clusters))
 
         # Get poses in largest cluster
         labels, counts = np.unique(clusters, return_counts=True)
         largest_cluster_label = np.argmax(counts)
-        indices = [i for i, x in enumerate(poses) if x == largest_cluster_label]
+        indices = [i for i in range(len(labels)) if clusters[i] == largest_cluster_label]
         largest_cluster = poses[indices]
 
         # Get average of poses in largest cluster
@@ -153,12 +153,12 @@ class ParticleFilter:
             # Publish this "average" pose as a transform between the map and the car's expected base_link
             self.publish_pose(avg_pose)
 
-    def publish_pose(self, pose):
+    def publish_pose(self, avg_pose):
         """ Publish a transform between the map and the base_link frome of the given pose. """
         # Publish this "average" pose as a transform between the map and the car's expected base_link
         new_pose = PoseWithCovarianceStamped()
-        new_pose.pose.point = [pose[0], pose[1], 0]
-        new_pose.pose.quaternion = [0,0,1,pose[2]]
+        new_pose.pose.position = [avg_pose[0], avg_pose[1], 0]
+        new_pose.pose.quaternion = [0,0,1,avg_pose[2]]
         # create covariance matrix somehow
         self.odom_pub.publish(new_pose)
 
