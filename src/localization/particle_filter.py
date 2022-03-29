@@ -23,10 +23,10 @@ class ParticleFilter:
         # Setup
         self.lock = threading.Lock()
         self.num_particles = 100 # TODO: Initialize particles
-        self.particles = None
+        self.particles = np.zeros((self.num_particles, 3))
+        self.initialized = False
         # Get parameters
-        self.particle_filter_frame = \
-                rospy.get_param("~particle_filter_frame")
+        self.particle_filter_frame = rospy.get_param("~particle_filter_frame")
 
         # Initialize publishers/subscribers
         #
@@ -39,7 +39,7 @@ class ParticleFilter:
         #     information, and *not* use the pose component.
         scan_topic = rospy.get_param("~scan_topic", "/scan")
         odom_topic = rospy.get_param("~odom_topic", "/odom")
-        self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_callback, queue_size=1)
+        # self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_callback, queue_size=1)
         self.odom_sub  = rospy.Subscriber(odom_topic, Odometry, self.odom_callback, queue_size=1)
 
         #  *Important Note #2:* You must respond to pose
@@ -86,7 +86,7 @@ class ParticleFilter:
         # Cluster poses
         # Use sin and cos to avoid circular mean problems
         poses = np.array([[x, y, np.sin(theta), np.cos(theta)] for x, y, theta in particles])
-        clusters = DBSCAN.fit_predict(poses, eps=0.5, min_samples=5) # TODO: Tweak the eps and min_samples values based off our data
+        clusters = DBSCAN(eps=0.5, min_samples=5).fit_predict(poses) # TODO: Tweak the eps and min_samples values based off our data
         rospy.loginfo("Number of clusters: %d", len(set(clusters)))
         rospy.loginfo("Clusters %s", set(clusters))
 
@@ -107,7 +107,7 @@ class ParticleFilter:
     def lidar_callback(self, msg):
         """ Compute particle likelihoods and resample particles. """
         # Takes in lidar data and calls sensor_model to get particle likelihoods
-        if not self.particles:
+        if not self.initialized:
             return
         ranges = np.array(msg.ranges)
         particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
@@ -128,7 +128,7 @@ class ParticleFilter:
     def odom_callback(self, msg):
         """ Update particle positions based on odometry."""
         # Takes in odometry data then calls motion_model to update the particles
-        if not self.particles:
+        if not self.initialized:
             return
         # Twist gets us the Linear/Angular velocities
         vx = msg.twist.twist.linear.x
@@ -140,12 +140,12 @@ class ParticleFilter:
         dt = curr_time - self.last_update
         self.last_update = curr_time
         odom = np.array([vx*dt, vy*dt, vtheta*dt])
-        rospy.loginfo(self.particles)
         propogated_particles = self.motion_model.evaluate(self.particles, odom)
         with self.lock:
             self.particles = propogated_particles
 
             # Determine the "average" particle pose
+            rospy.loginfo("here")
             avg_pose = self.get_average_pose(self.particles)
             self.pub_point_cloud()
             self.estimated_pose = avg_pose
@@ -168,10 +168,11 @@ class ParticleFilter:
         y = msg.pose.pose.position.y
 
         base_noise = .5
-        self.particles[:, 0] = x + np.random.uniform(-base_noise, base_noise)
-        self.particles[:, 1] = y + np.random.uniform(-base_noise, base_noise)
+        self.particles[:, 0] = x + np.random.uniform(-base_noise, base_noise, self.num_particles)
+        self.particles[:, 1] = y + np.random.uniform(-base_noise, base_noise, self.num_particles)
         self.particles[:, 2] = np.random.uniform(-np.pi, np.pi, self.num_particles)
         self.last_update = time.time()
+        self.initialized = True
 
     def pub_point_cloud(self):
         ''' Publishes the point cloud of the particles '''
