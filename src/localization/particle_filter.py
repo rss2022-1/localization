@@ -6,6 +6,7 @@ from motion_model import MotionModel
 import numpy as np
 import time
 import threading
+from sklearn.cluster import DBSCAN
 
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
@@ -78,7 +79,10 @@ class ParticleFilter:
         values. See this page: mean of circular quantities.
         Also consider the case where your distribution is multi modal - an average could pick
         a very unlikely pose between two modes. What better notions of "average" could you use? """
-        pass
+        poses = np.array([[x, y, np.cos(theta), np.sin(theta)] for x, y, theta in particles])
+        clusters = DBSCAN.fit_predict(poses, eps=0.5, min_samples=5) # TODO: Tweak the eps and min_samples values based off our data
+        rospy.loginfo("Number of clusters: %d", len(set(clusters)))
+        rospy.loginfo("Clusters %s", set(clusters))
 
 
     def lidar_callback(self, msg):
