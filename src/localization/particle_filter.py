@@ -157,8 +157,13 @@ class ParticleFilter:
         """ Publish a transform between the map and the base_link frome of the given pose. """
         # Publish this "average" pose as a transform between the map and the car's expected base_link
         new_pose = PoseWithCovarianceStamped()
-        new_pose.pose.position = [avg_pose[0], avg_pose[1], 0]
-        new_pose.pose.quaternion = [0,0,1,avg_pose[2]]
+        new_pose.pose.pose.position.x = avg_pose[0]
+        new_pose.pose.pose.position.y = avg_pose[1]
+        new_pose.pose.pose.position.z = 0
+        new_pose.pose.pose.orientation.w = 0
+        new_pose.pose.pose.orientation.x = 0
+        new_pose.pose.pose.orientation.y = 1
+        new_pose.pose.pose.orientation.z = avg_pose[2]
         # create covariance matrix somehow
         self.odom_pub.publish(new_pose)
 
