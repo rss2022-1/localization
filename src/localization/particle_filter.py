@@ -12,6 +12,7 @@ from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from geometry_msgs.msg import TwistWithCovarianceStamped, Point32, Point
+from ackermann_msgs.msg import AckermannDriveStamped
 
 
 class ParticleFilter:
@@ -39,7 +40,7 @@ class ParticleFilter:
         #     information, and *not* use the pose component.
         scan_topic = rospy.get_param("~scan_topic", "/scan")
         odom_topic = rospy.get_param("~odom_topic", "/odom")
-        # self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_callback, queue_size=1)
+        self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_callback, queue_size=1)
         self.odom_sub  = rospy.Subscriber(odom_topic, Odometry, self.odom_callback, queue_size=1)
 
         #  *Important Note #2:* You must respond to pose
@@ -114,7 +115,6 @@ class ParticleFilter:
 
         # Resample particles based on likelihoods
         num_particles = self.num_particles # TODO: Check to make sure this makes sense
-        rospy.loginfo(particle_likelihoods)
         sampled_particles = np.random.choice(self.particles, num_particles, p=particle_likelihoods)
         with self.lock:
             self.particles = sampled_particles
@@ -123,6 +123,7 @@ class ParticleFilter:
             avg_pose = self.get_average_pose(sampled_particles)
             self.pub_point_cloud()
             self.estimated_pose = avg_pose
+            self.pub_pose_estimation(avg_pose)
             self.publish_pose(avg_pose)
 
     def odom_callback(self, msg):
@@ -145,10 +146,10 @@ class ParticleFilter:
             self.particles = propogated_particles
 
             # Determine the "average" particle pose
-            rospy.loginfo("here")
             avg_pose = self.get_average_pose(self.particles)
             self.pub_point_cloud()
             self.estimated_pose = avg_pose
+            self.pub_pose_estimation(avg_pose)
 
             # Publish this "average" pose as a transform between the map and the car's expected base_link
             self.publish_pose(avg_pose)
@@ -156,10 +157,6 @@ class ParticleFilter:
     def publish_pose(self, avg_pose):
         """ Publish a transform between the map and the base_link frome of the given pose. """
         # Publish this "average" pose as a transform between the map and the car's expected base_link
-        # new_pose.pose.pose.orientation.w = 0
-        # new_pose.pose.pose.orientation.x = 0
-        # new_pose.pose.pose.orientation.y = 1
-        # new_pose.pose.pose.orientation.z = avg_pose[2]
         odom = Odometry()
         odom.header.frame_id = "/map"
         odom.header.stamp = rospy.Time.now()
@@ -198,7 +195,7 @@ class ParticleFilter:
 
         self.cloud_publisher.publish(cloud)
 
-    def pub_pose_estimation(self):
+    def pub_pose_estimation(self, avg_pose):
         ''' Publishes the current estimated pose of the car '''
         estimation = Marker()
         estimation.header.frame_id = "/map"
@@ -209,16 +206,29 @@ class ParticleFilter:
         estimation.action = estimation.ADD
         estimation.points = [Point(), Point()]
         # Start
-        estimation.points[0].x = self.estimated_pose[0]
-        estimation.points[0].y = self.estimated_pose[1]
+        estimation.points[0].x = avg_pose[0]
+        estimation.points[0].y = avg_pose[1]
         estimation.points[0].z = 0
         # End
-        estimation.points[1].x = np.cos(self.estimated_pose[2]) + self.estimated_pose[0]
-        estimation.points[1].y = np.sin(self.estimated_pose[2]) + self.estimated_pose[1]
+        estimation.points[1].x = np.cos(avg_pose[2]) + avg_pose[0]
+        estimation.points[1].y = np.sin(avg_pose[2]) + avg_pose[1]
         estimation.points[1].z = 0
+        estimation.color.a = 1.0
+        estimation.color.g = 1.0
         estimation.scale.x = .2
         estimation.scale.y = .2
         self.estimation_publisher.publish(estimation)
+
+    def create_ackermann_msg(self, steering_angle):
+        msg = AckermannDriveStamped()
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = 'map'
+        msg.drive.steering_angle = steering_angle
+        msg.drive.steering_angle_velocity = 0.0
+        msg.drive.speed = self.VELOCITY
+        msg.drive.acceleration = 0.5
+        msg.drive.jerk = 0.0
+        return msg
 
 if __name__ == "__main__":
     rospy.init_node("particle_filter")
