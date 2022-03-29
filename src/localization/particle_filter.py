@@ -4,6 +4,7 @@ import rospy
 from sensor_model import SensorModel
 from motion_model import MotionModel
 import numpy as np
+import time
 import threading
 
 from sensor_msgs.msg import LaserScan
@@ -15,9 +16,13 @@ from geometry_msgs.msg import TwistWithCovarianceStamped
 class ParticleFilter:
 
     def __init__(self):
+        # Initialize class variables
+        self.last_update = time.time()
+
+        # Setup
         self.lock = threading.Lock()
         self.num_particles = 100 # TODO: Initialize particles
-        self.particles = np.zeros((1, self.num_particles)) 
+        self.particles = np.zeros((1, self.num_particles))
         # Get parameters
         self.particle_filter_frame = \
                 rospy.get_param("~particle_filter_frame")
@@ -50,7 +55,7 @@ class ParticleFilter:
         #     odometry you publish here should be with respect to the
         #     "/map" frame.
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
-        
+
         # Initialize the models
         self.motion_model = MotionModel()
         self.sensor_model = SensorModel()
@@ -68,13 +73,13 @@ class ParticleFilter:
     def get_average_pose(self, particles):
         """ Compute the "average" pose of the particles. """
 
-        """ NOTE: As for determining the "average pose" of all of your particles, 
+        """ NOTE: As for determining the "average pose" of all of your particles,
         be careful with taking the average of  𝜃
-        values. See this page: mean of circular quantities. 
-        Also consider the case where your distribution is multi modal - an average could pick 
+        values. See this page: mean of circular quantities.
+        Also consider the case where your distribution is multi modal - an average could pick
         a very unlikely pose between two modes. What better notions of "average" could you use? """
         pass
-    
+
 
     def lidar_callback(self, msg):
         """ Compute particle likelihoods and resample particles. """
@@ -88,10 +93,9 @@ class ParticleFilter:
         with self.lock:
             self.particles = sampled_particles
 
-        # Publish the "average" pose as a transform between the map and the car's expected base_link
-        avg_pose = self.get_average_pose(sampled_particles)
-        self.publish_pose()
-        pass
+            # Publish the "average" pose as a transform between the map and the car's expected base_link
+            avg_pose = self.get_average_pose(sampled_particles)
+            self.publish_pose(avg_pose)
 
     def odom_callback(self, msg):
         """ Update particle positions based on odometry."""
@@ -101,17 +105,19 @@ class ParticleFilter:
         vtheta = msg.twist.angular[-1]
 
         #   Use a Set dt to find dx, dy, and dtheta
-        dt = 1/20.
+        curr_time = time.time()
+        dt = curr_time - self.last_update
+        self.last_update = curr_time
         odom = np.array([vx*dt, vy*dt, vtheta*dt])
         propogated_particles = self.motion_model.evaluate(self.particles, odom)
         with self.lock:
             self.particles = propogated_particles
-        
-        # Determine the "average" particle pose
-        avg_pose = self.get_average_pose(self.particles)
 
-        # Publish this "average" pose as a transform between the map and the car's expected base_link
-        self.publish_pose(avg_pose)
+            # Determine the "average" particle pose
+            avg_pose = self.get_average_pose(self.particles)
+
+            # Publish this "average" pose as a transform between the map and the car's expected base_link
+            self.publish_pose(avg_pose)
 
     def publish_pose(self, pose):
         """ Publish a transform between the map and the base_link frome of the given pose. """
