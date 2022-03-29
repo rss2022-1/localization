@@ -101,8 +101,9 @@ class ParticleFilter:
         """ Update particle positions based on odometry."""
         # Takes in odometry data then calls motion_model to update the particles
         # Twist gets us the Linear/Angular velocities
-        vx, vy = msg.twist.linear[:2]
-        vtheta = msg.twist.angular[-1]
+        vx = msg.twist.linear.x
+        vy = msg.twist.linear.y
+        vtheta = msg.twist.angular.z
 
         #   Use a Set dt to find dx, dy, and dtheta
         curr_time = time.time()
@@ -130,7 +131,14 @@ class ParticleFilter:
 
     def initialpose_callback(self, msg):
         """ Initialize particle positions based on an initial pose estimate. """
-        pass
+        x = msg.pose.pose.position.x
+        y = msg.pose.pose.position.y
+
+        base_noise = .5
+        self.particles[:, 0] = x + np.random.uniform(-base_noise, base_noise)
+        self.particles[:, 1] = y + np.random.uniform(-base_noise, base_noise)
+        self.particles[:, 2] = np.random.uniform(-np.pi, np.pi, self.num_particles)
+        self.last_update = time.time()
 
 if __name__ == "__main__":
     rospy.init_node("particle_filter")
