@@ -5,10 +5,10 @@ from motion_model import MotionModel
 import numpy as np
 import time
 import threading
-from sklearn.cluster import DBSCAN
+# from sklearn.cluster import DBSCAN
 
 from sensor_msgs.msg import LaserScan, PointCloud
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, OccupancyGrid
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from geometry_msgs.msg import TwistWithCovarianceStamped, Point32, Point, Vector3
@@ -85,8 +85,13 @@ class ParticleFilter:
         #
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
-        msg = self.create_ackermann_msg(0)
-        self.drive_publisher.publish(msg)
+        self.map_initialized = False
+        self.map_subscriber = rospy.Subscriber("/map", OccupancyGrid, self.map_callback, queue_size=1)
+
+    def map_callback(self, map_msg):
+        """ Callback for the map. """
+        self.map_initialized = True
+
 
     def get_average_pose(self, particles):
         """ Compute the "average" pose of the particles. """
@@ -99,22 +104,21 @@ class ParticleFilter:
         # Cluster poses
         # Use sin and cos to avoid circular mean problems
         poses = np.array([[x, y, np.sin(theta), np.cos(theta)] for x, y, theta in particles])
-        clusters = DBSCAN(eps=0.5, min_samples=5).fit_predict(poses) # TODO: Tweak the eps and min_samples values based off our data
+        # clusters = DBSCAN(eps=0.05, min_samples=100).fit_predict(poses) # TODO: Tweak the eps and min_samples values based off our data
         # rospy.loginfo("Number of clusters: %d", len(set(clusters)))
         # rospy.loginfo("Clusters %s", set(clusters))
 
         # Get poses in largest cluster
-        labels, counts = np.unique(clusters, return_counts=True)
-        largest_cluster_label = np.argmax(counts)
-        indices = [i for i in range(len(labels)) if clusters[i] == largest_cluster_label]
-        largest_cluster = poses[indices]
+        # labels, counts = np.unique(clusters, return_counts=True)
+        # largest_cluster_label = np.argmax(counts)
+        # indices = [i for i in range(len(labels)) if clusters[i] == largest_cluster_label]
+        # largest_cluster = poses[indices]
 
         # Get average of poses in largest cluster
         # Uses arctan2 method for circular mean as seen on Wikipedia
-        avg = np.mean(largest_cluster, axis=0)
+        avg = np.mean(poses, axis=0)
         x_bar, y_bar = avg[0], avg[1]
         theta_bar = np.arctan2(avg[2], avg[3])
-
 
         try:
             t = self.tf.getLatestCommonTime("map", "base_link")
@@ -137,7 +141,7 @@ class ParticleFilter:
     def lidar_callback(self, msg):
         """ Compute particle likelihoods and resample particles. """
         # Takes in lidar data and calls sensor_model to get particle likelihoods
-        if not self.initialized:
+        if not self.initialized and not self.map_initialized:
             return
         ranges = np.array(msg.ranges)
         particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
@@ -159,7 +163,7 @@ class ParticleFilter:
     def odom_callback(self, msg):
         """ Update particle positions based on odometry."""
         # Takes in odometry data then calls motion_model to update the particles
-        if not self.initialized:
+        if not self.initialized and not self.map_initialized:
             return
         # Twist gets us the Linear/Angular velocities
         vx = msg.twist.twist.linear.x
