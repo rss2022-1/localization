@@ -7,10 +7,11 @@ import numpy as np
 import time
 import threading
 
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, PointCloud
 from nav_msgs.msg import Odometry
+from visualization_msgs.msg import Marker
 from geometry_msgs.msg import PoseWithCovarianceStamped
-from geometry_msgs.msg import TwistWithCovarianceStamped
+from geometry_msgs.msg import TwistWithCovarianceStamped, Point32
 
 
 class ParticleFilter:
@@ -54,7 +55,9 @@ class ParticleFilter:
         #     provide the twist part of the Odometry message. The
         #     odometry you publish here should be with respect to the
         #     "/map" frame.
+        self.cloud_topic = rospy.get_param("~particle_topic")
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
+        self.particle_cloud_publisher = rospy.Publisher(self.cloud_topic, PointCloud, queue_size=10)
 
         # Initialize the models
         self.motion_model = MotionModel()
@@ -139,6 +142,18 @@ class ParticleFilter:
         self.particles[:, 1] = y + np.random.uniform(-base_noise, base_noise)
         self.particles[:, 2] = np.random.uniform(-np.pi, np.pi, self.num_particles)
         self.last_update = time.time()
+
+    def pub_point_cloud(self):
+        ''' Publishes the point cloud of the particles '''
+        cloud = PointCloud()
+        cloud.header.frame_id = "/map"
+        cloud.points = [Point32() for i in range(self.num_particles)]
+        for i in range(self.num_particles):
+            cloud.points[i].x = self.particles[i, 0]
+            cloud.points[i].y = self.particles[i, 1]
+            cloud.points[i].z = 0
+
+        self.cloud_publisher.publish(cloud)
 
 if __name__ == "__main__":
     rospy.init_node("particle_filter")
