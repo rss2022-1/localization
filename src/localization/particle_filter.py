@@ -11,8 +11,11 @@ from sensor_msgs.msg import LaserScan, PointCloud
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import PoseWithCovarianceStamped
-from geometry_msgs.msg import TwistWithCovarianceStamped, Point32, Point
+from geometry_msgs.msg import TwistWithCovarianceStamped, Point32, Point, Vector3
 from ackermann_msgs.msg import AckermannDriveStamped
+import tf2_ros
+import tf.transformations as transformations
+from tf import TransformListener
 
 
 class ParticleFilter:
@@ -20,10 +23,11 @@ class ParticleFilter:
     def __init__(self):
         # Initialize class variables
         self.last_update = time.time()
+        self.VELOCITY = .5
 
         # Setup
         self.lock = threading.Lock()
-        self.num_particles = 100 # TODO: Initialize particles
+        self.num_particles = rospy.get_param("~num_particles")
         self.particles = np.zeros((self.num_particles, 3))
         self.initialized = False
         # Get parameters
@@ -61,6 +65,12 @@ class ParticleFilter:
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
         self.cloud_publisher = rospy.Publisher(self.cloud_topic, PointCloud, queue_size=10)
         self.estimation_publisher = rospy.Publisher(self.estimation_topic, Marker, queue_size=10)
+        self.drive_publisher = rospy.Publisher("/vesc/high_level/ackermann_cmd_mux/input/nav_0", AckermannDriveStamped, queue_size=10)
+
+        # Testing publishers
+        self.actual_positions_pub = rospy.Publisher("actual_position", Vector3, queue_size=10)
+        self.pred_positions_pub = rospy.Publisher("predicted_position", Vector3, queue_size=10)
+        self.tf = TransformListener()
 
         # Initialize the models
         self.motion_model = MotionModel()
@@ -75,6 +85,8 @@ class ParticleFilter:
         #
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
+        msg = self.create_ackermann_msg(0)
+        self.drive_publisher.publish(msg)
 
     def get_average_pose(self, particles):
         """ Compute the "average" pose of the particles. """
@@ -102,6 +114,23 @@ class ParticleFilter:
         avg = np.mean(largest_cluster, axis=0)
         x_bar, y_bar = avg[0], avg[1]
         theta_bar = np.arctan2(avg[2], avg[3])
+
+
+        try:
+            t = self.tf.getLatestCommonTime("map", "base_link")
+            position, quaternion = self.tf.lookupTransform("map", "base_link", t)
+            actual = Vector3()
+            actual.x = position[0]
+            actual.y = position[1]
+            actual.z = position[2]
+            self.actual_positions_pub.publish(actual)
+            predicted = Vector3()
+            predicted.x = x_bar
+            predicted.y = y_bar
+            predicted.z = 0
+            self.pred_positions_pub.publish(predicted)
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException, rospy.exceptions.ROSTimeMovedBackwardsException):
+            rospy.loginfo("Could not get positions")
 
         return x_bar, y_bar, theta_bar
 
@@ -139,7 +168,8 @@ class ParticleFilter:
 
         #   Use a Set dt to find dx, dy, and dtheta
         curr_time = time.time()
-        dt = curr_time - self.last_update
+        # dt = curr_time - self.last_update
+        dt = 1/20.
         self.last_update = curr_time
         odom = np.array([vx*dt, vy*dt, vtheta*dt])
         propogated_particles = self.motion_model.evaluate(self.particles, odom)
@@ -159,15 +189,15 @@ class ParticleFilter:
         """ Publish a transform between the map and the base_link frome of the given pose. """
         # Publish this "average" pose as a transform between the map and the car's expected base_link
         odom = Odometry()
-        odom.header.frame_id = "/map"
+        odom.header.frame_id = self.particle_filter_frame
         odom.header.stamp = rospy.Time.now()
         odom.pose.pose.position.x = avg_pose[0]
         odom.pose.pose.position.y = avg_pose[1]
         odom.pose.pose.position.z = 0
-        odom.pose.pose.orientation.w = 0
         odom.pose.pose.orientation.x = 0
-        odom.pose.pose.orientation.y = 1
-        odom.pose.pose.orientation.z = avg_pose[2]
+        odom.pose.pose.orientation.y = 0
+        odom.pose.pose.orientation.z = 1
+        odom.pose.pose.orientation.w = avg_pose[2]
 
         # create covariance matrix somehow
         self.odom_pub.publish(odom)
@@ -223,7 +253,7 @@ class ParticleFilter:
     def create_ackermann_msg(self, steering_angle):
         msg = AckermannDriveStamped()
         msg.header.stamp = rospy.Time.now()
-        msg.header.frame_id = 'map'
+        msg.header.frame_id = '/map'
         msg.drive.steering_angle = steering_angle
         msg.drive.steering_angle_velocity = 0.0
         msg.drive.speed = self.VELOCITY
