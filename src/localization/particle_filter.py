@@ -83,11 +83,26 @@ class ParticleFilter:
         values. See this page: mean of circular quantities.
         Also consider the case where your distribution is multi modal - an average could pick
         a very unlikely pose between two modes. What better notions of "average" could you use? """
-        poses = np.array([[x, y, np.cos(theta), np.sin(theta)] for x, y, theta in particles])
+        # Cluster poses
+        # Use sin and cos to avoid circular mean problems
+        poses = np.array([[x, y, np.sin(theta), np.cos(theta)] for x, y, theta in particles])
         clusters = DBSCAN.fit_predict(poses, eps=0.5, min_samples=5) # TODO: Tweak the eps and min_samples values based off our data
         rospy.loginfo("Number of clusters: %d", len(set(clusters)))
         rospy.loginfo("Clusters %s", set(clusters))
 
+        # Get poses in largest cluster
+        labels, counts = np.unique(clusters, return_counts=True)
+        largest_cluster_label = np.argmax(counts)
+        indices = [i for i, x in enumerate(poses) if x == largest_cluster_label]
+        largest_cluster = poses[indices]
+
+        # Get average of poses in largest cluster
+        # Uses arctan2 method for circular mean as seen on Wikipedia
+        avg = np.mean(largest_cluster, axis=0)
+        x_bar, y_bar = avg[0], avg[1]
+        theta_bar = np.arctan2(avg[2], avg[3])
+
+        return x_bar, y_bar, theta_bar
 
     def lidar_callback(self, msg):
         """ Compute particle likelihoods and resample particles. """
