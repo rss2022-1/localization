@@ -112,10 +112,11 @@ class ParticleFilter:
             return
         ranges = np.array(msg.ranges)
         particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
+        particle_likelihoods = particle_likelihoods / np.sum(particle_likelihoods) # Normalize to sum to 1
 
         # Resample particles based on likelihoods
-        num_particles = self.num_particles # TODO: Check to make sure this makes sense
-        sampled_particles = np.random.choice(self.particles, num_particles, p=particle_likelihoods)
+        sampled_particles_indices = np.random.choice(len(self.particles), self.num_particles, p=particle_likelihoods)
+        sampled_particles = self.particles[sampled_particles_indices]
         with self.lock:
             self.particles = sampled_particles
 
