@@ -1,4 +1,5 @@
 import numpy as np
+import rospy
 
 
 
@@ -11,6 +12,7 @@ class MotionModel:
         # Do any precomputation for the motion
         # model here.
         self.scale = .05
+        self.deterministic = rospy.get_param("~deterministic", "/cloud_map")
 
         ####################################
 
@@ -46,8 +48,10 @@ class MotionModel:
                                 [np.sin(p_theta), np.cos(p_theta), py],
                                 [0, 0, 1]])
             new_pos = np.dot(particle_mx, odometry_mx)
-            # res.append(np.array([new_pos[0][2] + self.noise(self.scale), new_pos[1][2] + self.noise(self.scale), theta + particle[-1] + self.noise(self.scale)]))
-            res.append(np.array([new_pos[0][2], new_pos[1][2], theta + particle[-1]]))
+            if self.deterministic:
+                res.append(np.array([new_pos[0][2], new_pos[1][2], theta + particle[-1]]))
+            else:
+                res.append(np.array([new_pos[0][2] + self.noise(self.scale), new_pos[1][2] + self.noise(self.scale), theta + particle[-1] + self.noise(self.scale)]))
         return np.array(res)
 
         ####################################

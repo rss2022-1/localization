@@ -12,7 +12,7 @@ from sensor_msgs.msg import LaserScan, PointCloud
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import PoseWithCovarianceStamped
-from geometry_msgs.msg import TwistWithCovarianceStamped, Point32
+from geometry_msgs.msg import TwistWithCovarianceStamped, Point32, Point
 
 
 class ParticleFilter:
@@ -56,9 +56,11 @@ class ParticleFilter:
         #     provide the twist part of the Odometry message. The
         #     odometry you publish here should be with respect to the
         #     "/map" frame.
-        self.cloud_topic = rospy.get_param("~particle_topic")
+        self.cloud_topic = rospy.get_param("~cloud_topic", "cloud_map")
+        self.estimation_topic = rospy.get_param("~estimation_topic", "/estim_marker")
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
         self.particle_cloud_publisher = rospy.Publisher(self.cloud_topic, PointCloud, queue_size=10)
+        self.estimation_publisher = rospy.Publisher(self.estimation_topic, Marker, queue_size=10)
 
         # Initialize the models
         self.motion_model = MotionModel()
@@ -102,6 +104,8 @@ class ParticleFilter:
 
             # Publish the "average" pose as a transform between the map and the car's expected base_link
             avg_pose = self.get_average_pose(sampled_particles)
+            self.pub_point_cloud()
+            self.estimated_pose = avg_pose
             self.publish_pose(avg_pose)
 
     def odom_callback(self, msg):
@@ -123,6 +127,8 @@ class ParticleFilter:
 
             # Determine the "average" particle pose
             avg_pose = self.get_average_pose(self.particles)
+            self.pub_point_cloud()
+            self.estimated_pose = avg_pose
 
             # Publish this "average" pose as a transform between the map and the car's expected base_link
             self.publish_pose(avg_pose)
@@ -158,6 +164,28 @@ class ParticleFilter:
             cloud.points[i].z = 0
 
         self.cloud_publisher.publish(cloud)
+
+    def pub_pose_estimation(self):
+        #arrow marker for current pose
+        estimation = Marker()
+        estimation.header.frame_id = "/map"
+        estimation.header.stamp = rospy.Time.now()
+        estimation.ns = "estimation_marker"
+        estimation.id = 0
+        estimation.type = estimation.ARROW
+        estimation.action = estimation.ADD
+        estimation.points = [Point(), Point()]
+        # Start
+        estimation.points[0].x = self.estimated_pose[0]
+        estimation.points[0].y = self.estimated_pose[1]
+        estimation.points[0].z = 0
+        # End
+        estimation.points[1].x = np.cos(self.estimated_pose[2]) + self.estimated_pose[0]
+        estimation.points[1].y = np.sin(self.estimated_pose[2]) + self.estimated_pose[1]
+        estimation.points[1].z = 0
+        estimation.scale.x = .2
+        estimation.scale.y = .2
+        self.estimation_publisher.publish(estimation)
 
 if __name__ == "__main__":
     rospy.init_node("particle_filter")

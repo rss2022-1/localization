@@ -26,3 +26,6 @@ deterministic: true
 
 # Used to scale data in sensor model from meters to pixels
 lidar_scale_to_map_scale: 1.0
+
+cloud_topic: "/cloud_map"
+estimation_topic: "/estim_marker"
