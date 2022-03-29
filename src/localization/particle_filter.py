@@ -39,7 +39,7 @@ class ParticleFilter:
         #     information, and *not* use the pose component.
         scan_topic = rospy.get_param("~scan_topic", "/scan")
         odom_topic = rospy.get_param("~odom_topic", "/odom")
-        # self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_callback, queue_size=1)
+        self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_callback, queue_size=1)
         self.odom_sub  = rospy.Subscriber(odom_topic, Odometry, self.odom_callback, queue_size=1)
 
         #  *Important Note #2:* You must respond to pose
@@ -111,11 +111,11 @@ class ParticleFilter:
             return
         ranges = np.array(msg.ranges)
         particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
+        particle_likelihoods = particle_likelihoods / np.sum(particle_likelihoods) # Normalize to sum to 1
 
         # Resample particles based on likelihoods
-        num_particles = self.num_particles # TODO: Check to make sure this makes sense
-        rospy.loginfo(particle_likelihoods)
-        sampled_particles = np.random.choice(self.particles, num_particles, p=particle_likelihoods)
+        sampled_particles_indices = np.random.choice(len(self.particles), self.num_particles, p=particle_likelihoods)
+        sampled_particles = self.particles[sampled_particles_indices]
         with self.lock:
             self.particles = sampled_particles
 
@@ -145,7 +145,6 @@ class ParticleFilter:
             self.particles = propogated_particles
 
             # Determine the "average" particle pose
-            rospy.loginfo("here")
             avg_pose = self.get_average_pose(self.particles)
             self.pub_point_cloud()
             self.estimated_pose = avg_pose

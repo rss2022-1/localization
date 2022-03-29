@@ -145,7 +145,7 @@ class SensorModel:
                 d = int(observation[j]) # ground truth
                 z = int(scan[j])
                 particle_likelihoods[i] *= self.sensor_model_table[d][z]
-
+    
         return particle_likelihoods**(1.0/2.2)
 
     def map_callback(self, map_msg):
