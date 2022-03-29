@@ -1,5 +1,4 @@
 #!/usr/bin/env python2
-
 import rospy
 from sensor_model import SensorModel
 from motion_model import MotionModel
@@ -80,7 +79,7 @@ class ParticleFilter:
         """ Compute the "average" pose of the particles. """
 
         """ NOTE: As for determining the "average pose" of all of your particles,
-        be careful with taking the average of  𝜃
+        be careful with taking the average of theta
         values. See this page: mean of circular quantities.
         Also consider the case where your distribution is multi modal - an average could pick
         a very unlikely pose between two modes. What better notions of "average" could you use? """
@@ -166,7 +165,7 @@ class ParticleFilter:
         self.cloud_publisher.publish(cloud)
 
     def pub_pose_estimation(self):
-        #arrow marker for current pose
+        ''' Publishes the current estimated pose of the car '''
         estimation = Marker()
         estimation.header.frame_id = "/map"
         estimation.header.stamp = rospy.Time.now()
@@ -191,4 +190,3 @@ if __name__ == "__main__":
     rospy.init_node("particle_filter")
     pf = ParticleFilter()
     rospy.spin()
-)

@@ -42,7 +42,7 @@ class SensorModel:
                 self.scan_field_of_view,
                 0, # This is not the simulator, don't add noise
                 0.01, # This is used as an epsilon
-                self.scan_theta_discretization) 
+                self.scan_theta_discretization)
 
         # Subscribe to the map
         self.map = None
@@ -58,8 +58,8 @@ class SensorModel:
     def precompute_sensor_model(self):
         """
         Generate and store a table which represents the sensor model.
-        
-        For each discrete computed range value, this provides the probability of 
+
+        For each discrete computed range value, this provides the probability of
         measuring any (discrete) range. This table is indexed by the sensor model
         at runtime by discretizing the measurements and computed ranges from
         RangeLibc.
@@ -70,7 +70,7 @@ class SensorModel:
 
         args:
             N/A
-        
+
         returns:
             No return type. Directly modify `self.sensor_model_table`.
         """
@@ -84,7 +84,7 @@ class SensorModel:
                 p_short = 2.0/d * (1-float(z)/float(d)) if (z <= d and d != 0) else 0.0
                 p_max = float(z == self.z_max)
                 p_rand = 1.0/self.z_max if z <= self.z_max else 0.0
-                
+
                 result_without_hit = self.alpha_short * p_short + self.alpha_max * p_max + self.alpha_rand * p_rand
                 self.sensor_model_table[z][d] = result_without_hit
                 p_hit_table[z][d] = p_hit
@@ -107,7 +107,7 @@ class SensorModel:
 
         args:
             particles: An Nx3 matrix of the form:
-            
+
                 [x0 y0 theta0]
                 [x1 y0 theta1]
                 [    ...     ]
@@ -130,7 +130,7 @@ class SensorModel:
         stacked_scans = np.rint(stacked_scans) # discretize
         stacked_scans = stacked_scans.astype(np.uint16)
         stacked_scans = np.clip(stacked_scans, 0, self.z_max) # clip
-        
+
         # Convert ground truth scan values from meters to pixels and clip values
         observation /= float(self.map_resolution * self.lidar_scale_to_map_scale)
         observation = np.rint(observation) # discretize
@@ -145,7 +145,7 @@ class SensorModel:
                 d = int(observation[j]) # ground truth
                 z = int(scan[j])
                 particle_likelihoods[i] *= self.sensor_model_table[d][z]
-        
+
         return particle_likelihoods**(1.0/2.2)
 
     def map_callback(self, map_msg):
@@ -171,7 +171,7 @@ class SensorModel:
                 map_msg.info.resolution,
                 origin,
                 0.5) # Consider anything < 0.5 to be free
-        
+
         # Add map resolution info
         self.map_resoultion = map_msg.info.resolution
 
