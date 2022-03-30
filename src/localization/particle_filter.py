@@ -22,6 +22,7 @@ class ParticleFilter:
 
     def __init__(self):
         # Initialize class variables
+        self.map_initialized = False
         self.last_update = time.time()
         self.sim = True
         self.previous_scan = None
@@ -89,14 +90,13 @@ class ParticleFilter:
         #
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
-        self.map_initialized = False
+
         self.map_subscriber = rospy.Subscriber("/map", OccupancyGrid, self.map_callback, queue_size=1)
 
     def map_callback(self, map_msg):
         """ Callback for the map. """
         self.map_initialized = True
 
-<<<<<<< HEAD
     def combine_scans(self, ranges):
         for i in range(len(ranges)):
             self.full_ranges[i] = min(self.previous_scan[i], ranges[i])/2.0
@@ -113,8 +113,6 @@ class ParticleFilter:
 
         ranges = self.full_ranges.roll(-self.num_lidar_scans/6) # roll the array to the left to handle lidar offset
         return np.array(ranges)
-=======
->>>>>>> c663e9e46ab5bd5cb94de09a8ce3d82225effc4b
 
     def get_average_pose(self, particles):
         """ Compute the "average" pose of the particles. """
