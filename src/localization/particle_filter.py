@@ -111,7 +111,8 @@ class ParticleFilter:
             self.flag = False
             self.previous_scan = None
 
-        ranges = self.full_ranges.roll(-self.num_lidar_scans/6) # roll the array to the left to handle lidar offset
+        # ranges = self.full_ranges.roll(-self.num_lidar_scans/6) # roll the array to the left to handle lidar offset
+        ranges = np.roll(self.full_ranges, int(self.num_lidar_scans/6)*-1)
         return np.array(ranges)
 
     def get_average_pose(self, particles):
@@ -184,7 +185,7 @@ class ParticleFilter:
                 self.estimated_pose = avg_pose
                 self.pub_pose_estimation(avg_pose)
                 self.publish_pose(avg_pose)
-                self.full_ranges = np.array([-1. for i in range(self.NUM_LIDAR_SCANS)])
+                self.full_ranges = np.array([-1. for i in range(self.num_lidar_scans)])
         else:
             rospy.loginfo("Waiting on full lidar data...")
 

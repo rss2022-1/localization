@@ -132,7 +132,8 @@ class SensorModel:
         stacked_scans = np.clip(stacked_scans, 0, self.z_max) # clip
 
         # Convert ground truth scan values from meters to pixels and clip values
-        observation /= float(self.map_resolution * self.lidar_scale_to_map_scale)
+        # observation = observation/float(self.map_resolution * self.lidar_scale_to_map_scale)
+        observation = np.divide(observation, float(self.map_resolution * self.lidar_scale_to_map_scale))
         observation = np.rint(observation) # discretize
         observation = observation.astype(np.uint16)
         observation = np.clip(observation, 0, self.z_max) # clip
