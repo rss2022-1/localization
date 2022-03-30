@@ -96,11 +96,10 @@ class ParticleFilter:
         """ Callback for the map. """
         self.map_initialized = True
 
-<<<<<<< HEAD
     def combine_scans(self, ranges):
         for i in range(len(ranges)):
             self.full_ranges[i] = min(self.previous_scan[i], ranges[i])/2.0
-        
+
     def get_ranges(self, data):
         if not self.flag:
             self.previous_scan = np.array(data.ranges)
@@ -113,8 +112,6 @@ class ParticleFilter:
 
         ranges = self.full_ranges.roll(-self.num_lidar_scans/6) # roll the array to the left to handle lidar offset
         return np.array(ranges)
-=======
->>>>>>> c663e9e46ab5bd5cb94de09a8ce3d82225effc4b
 
     def get_average_pose(self, particles):
         """ Compute the "average" pose of the particles. """
@@ -143,21 +140,22 @@ class ParticleFilter:
         x_bar, y_bar = avg[0], avg[1]
         theta_bar = np.arctan2(avg[2], avg[3])
 
-        try:
-            t = self.tf.getLatestCommonTime("map", "base_link")
-            position, quaternion = self.tf.lookupTransform("map", "base_link", t)
-            actual = Vector3()
-            actual.x = position[0]
-            actual.y = position[1]
-            actual.z = position[2]
-            self.actual_positions_pub.publish(actual)
-            predicted = Vector3()
-            predicted.x = x_bar
-            predicted.y = y_bar
-            predicted.z = 0
-            self.pred_positions_pub.publish(predicted)
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException, rospy.exceptions.ROSTimeMovedBackwardsException):
-            rospy.loginfo("Could not get positions")
+        if self.sim:
+            try:
+                t = self.tf.getLatestCommonTime("map", "base_link")
+                position, quaternion = self.tf.lookupTransform("map", "base_link", t)
+                actual = Vector3()
+                actual.x = position[0]
+                actual.y = position[1]
+                actual.z = position[2]
+                self.actual_positions_pub.publish(actual)
+                predicted = Vector3()
+                predicted.x = x_bar
+                predicted.y = y_bar
+                predicted.z = 0
+                self.pred_positions_pub.publish(predicted)
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException, rospy.exceptions.ROSTimeMovedBackwardsException):
+                rospy.loginfo("Could not get positions")
 
         return x_bar, y_bar, theta_bar
 
@@ -166,7 +164,7 @@ class ParticleFilter:
         # Takes in lidar data and calls sensor_model to get particle likelihoods
         if not self.initialized and not self.map_initialized:
             return
-        
+
         ranges = self.get_ranges(msg)
         if len(ranges) > 1:
             rospy.loginfo("Full Lidar data received.")
@@ -201,8 +199,8 @@ class ParticleFilter:
 
         #   Use a Set dt to find dx, dy, and dtheta
         curr_time = time.time()
-        # dt = curr_time - self.last_update
-        dt = 1/20.
+        dt = curr_time - self.last_update
+        # dt = 1/20.
         self.last_update = curr_time
         odom = np.array([vx*dt, vy*dt, vtheta*dt])
         propogated_particles = self.motion_model.evaluate(self.particles, odom)
