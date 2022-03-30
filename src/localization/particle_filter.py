@@ -25,6 +25,7 @@ class ParticleFilter:
         self.map_initialized = False
         self.last_update = time.time()
         self.sim = True
+        self.testing = False
         self.previous_scan = None
         self.flag = False
         self.num_lidar_scans = 100 if self.sim else 897
@@ -146,7 +147,7 @@ class ParticleFilter:
         x_bar, y_bar = avg[0], avg[1]
         theta_bar = np.arctan2(avg[2], avg[3])
 
-        if self.sim:
+        if self.sim and self.testing:
             try:
                 t = self.tf.getLatestCommonTime("map", "base_link")
                 position, quaternion = self.tf.lookupTransform("map", "base_link", t)
@@ -243,11 +244,15 @@ class ParticleFilter:
         """ Initialize particle positions based on an initial pose estimate. """
         x = msg.pose.pose.position.x
         y = msg.pose.pose.position.y
+        q = msg.pose.pose.orientation
+        theta = transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])[-1]
 
         base_noise = .5
         self.particles[:, 0] = x + np.random.normal(0, base_noise, self.num_particles)
         self.particles[:, 1] = y + np.random.normal(0, base_noise, self.num_particles)
-        self.particles[:, 2] = np.random.uniform(-np.pi, np.pi, self.num_particles)
+        # self.particles[:, 2] = np.random.uniform(-np.pi, np.pi, self.num_particles)
+        self.particles[:, 2] = theta + np.random.uniform(-np.pi/6., np.pi/6., self.num_particles)
+
         self.last_update = time.time()
         self.initialized = True
 
