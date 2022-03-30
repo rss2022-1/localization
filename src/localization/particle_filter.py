@@ -20,6 +20,11 @@ class ParticleFilter:
     def __init__(self):
         # Initialize class variables
         self.last_update = time.time()
+        self.sim = True
+        self.previous_scan = None
+        self.flag = False
+        self.num_lidar_scans = 100 if self.sim else 897
+        self.full_ranges = np.array([-1. for i in range(self.num_lidar_scans)])
 
         # Setup
         self.lock = threading.Lock()
@@ -81,7 +86,23 @@ class ParticleFilter:
     def map_callback(self, map_msg):
         """ Callback for the map. """
         self.map_initialized = True
+
+    def combine_scans(self, ranges):
+        for i in range(len(ranges)):
+            self.full_ranges[i] = min(self.previous_scan[i], ranges[i])/2.0
         
+    def get_ranges(self, data):
+        if not self.flag:
+            self.previous_scan = np.array(data.ranges)
+            self.flag = True
+            return [], []
+        else:
+            self.combine_scans(data.ranges)
+            self.flag = False
+            self.previous_scan = None
+
+        ranges = self.full_ranges.roll(-self.num_lidar_scans/6) # roll the array to the left to handle lidar offset
+        return np.array(ranges)
 
     def get_average_pose(self, particles):
         """ Compute the "average" pose of the particles. """
@@ -117,22 +138,28 @@ class ParticleFilter:
         # Takes in lidar data and calls sensor_model to get particle likelihoods
         if not self.initialized and not self.map_initialized:
             return
-        ranges = np.array(msg.ranges)
-        particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
-        particle_likelihoods = particle_likelihoods / np.sum(particle_likelihoods) # Normalize to sum to 1
+        
+        ranges = self.get_ranges(msg)
+        if len(ranges) > 1:
+            rospy.loginfo("Full Lidar data received.")
+            particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
+            particle_likelihoods = particle_likelihoods / np.sum(particle_likelihoods) # Normalize to sum to 1
 
-        # Resample particles based on likelihoods
-        sampled_particles_indices = np.random.choice(len(self.particles), self.num_particles, p=particle_likelihoods)
-        sampled_particles = self.particles[sampled_particles_indices]
-        with self.lock:
-            self.particles = sampled_particles
+            # Resample particles based on likelihoods
+            sampled_particles_indices = np.random.choice(len(self.particles), self.num_particles, p=particle_likelihoods)
+            sampled_particles = self.particles[sampled_particles_indices]
+            with self.lock:
+                self.particles = sampled_particles
 
-            # Publish the "average" pose as a transform between the map and the car's expected base_link
-            avg_pose = self.get_average_pose(sampled_particles)
-            self.pub_point_cloud()
-            self.estimated_pose = avg_pose
-            self.pub_pose_estimation(avg_pose)
-            self.publish_pose(avg_pose)
+                # Publish the "average" pose as a transform between the map and the car's expected base_link
+                avg_pose = self.get_average_pose(sampled_particles)
+                self.pub_point_cloud()
+                self.estimated_pose = avg_pose
+                self.pub_pose_estimation(avg_pose)
+                self.publish_pose(avg_pose)
+                self.full_ranges = np.array([-1. for i in range(self.NUM_LIDAR_SCANS)])
+        else:
+            rospy.loginfo("Waiting on full lidar data...")
 
     def odom_callback(self, msg):
         """ Update particle positions based on odometry."""
