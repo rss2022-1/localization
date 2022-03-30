@@ -9,7 +9,7 @@ import threading
 
 from sensor_msgs.msg import LaserScan, PointCloud
 from nav_msgs.msg import Odometry, OccupancyGrid
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from geometry_msgs.msg import TwistWithCovarianceStamped, Point32, Point, Vector3
 from ackermann_msgs.msg import AckermannDriveStamped
@@ -25,9 +25,11 @@ class ParticleFilter:
         self.map_initialized = False
         self.last_update = time.time()
         self.sim = True
-        self.testing = False
+        self.testing = True
         self.previous_scan = None
         self.flag = False
+        self.add_odom_noise = False
+        self.marker_arr = MarkerArray()
         self.num_lidar_scans = 100 if self.sim else 897
         self.full_ranges = np.array([-1. for i in range(self.num_lidar_scans)])
         self.velocity = 0.5
@@ -70,7 +72,7 @@ class ParticleFilter:
         self.estimation_topic = rospy.get_param("~estimation_topic", "/estim_marker")
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
         self.cloud_publisher = rospy.Publisher(self.cloud_topic, PointCloud, queue_size=10)
-        self.estimation_publisher = rospy.Publisher(self.estimation_topic, Marker, queue_size=10)
+        self.estimation_publisher = rospy.Publisher(self.estimation_topic, MarkerArray, queue_size=10)
         self.drive_publisher = rospy.Publisher("/vesc/high_level/ackermann_cmd_mux/input/nav_0", AckermannDriveStamped, queue_size=10)
 
         # Testing publishers
@@ -203,6 +205,10 @@ class ParticleFilter:
         vx = msg.twist.twist.linear.x
         vy = msg.twist.twist.linear.y
         vtheta = msg.twist.twist.angular.z
+        if self.add_odom_noise:
+            vx += np.random.normal(0, abs(vx/10.))
+            vy += np.random.normal(0, abs(vy/10.))
+            vtheta += np.random.normal(0, abs(vtheta/10.))
 
         #   Use a Set dt to find dx, dy, and dtheta
         curr_time = time.time()
@@ -247,11 +253,11 @@ class ParticleFilter:
         q = msg.pose.pose.orientation
         theta = transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])[-1]
 
-        base_noise = .5
+        base_noise = .2
         self.particles[:, 0] = x + np.random.normal(0, base_noise, self.num_particles)
         self.particles[:, 1] = y + np.random.normal(0, base_noise, self.num_particles)
         # self.particles[:, 2] = np.random.uniform(-np.pi, np.pi, self.num_particles)
-        self.particles[:, 2] = theta + np.random.uniform(-np.pi/6., np.pi/6., self.num_particles)
+        self.particles[:, 2] = theta# + np.random.uniform(-np.pi/12., np.pi/12., self.num_particles)
 
         self.last_update = time.time()
         self.initialized = True
@@ -290,7 +296,10 @@ class ParticleFilter:
         estimation.color.g = 1.0
         estimation.scale.x = .2
         estimation.scale.y = .2
-        self.estimation_publisher.publish(estimation)
+        self.marker_arr.markers.append(estimation)
+        if len(self.marker_arr.markers) > 1:
+            self.marker_arr.markers.pop(0)
+        self.estimation_publisher.publish(self.marker_arr)
 
     def create_ackermann_msg(self, steering_angle):
         msg = AckermannDriveStamped()
