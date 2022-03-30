@@ -140,10 +140,13 @@ class SensorModel:
 
         # Scan likelihood given by product of all likelihoods
         particle_likelihoods = np.ones(len(particles))
+        # rospy.loginfo('length of particles: %f', len(particles))
+        # rospy.loginfo(self.sensor_model_table.shape)
         for i in range(len(stacked_scans)):
             scan = stacked_scans[i]
             for j in range(len(scan)):
-                d = int(observation[j]) # ground truth
+                # d = int(observation[j]) # ground truth
+                d = observation[j].astype(int) # ground truth
                 z = int(scan[j])
                 particle_likelihoods[i] *= self.sensor_model_table[d][z]
     

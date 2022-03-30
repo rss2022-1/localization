@@ -99,20 +99,24 @@ class ParticleFilter:
 
     def combine_scans(self, ranges):
         for i in range(len(ranges)):
-            self.full_ranges[i] = min(self.previous_scan[i], ranges[i])/2.0
+            self.full_ranges[i] = min(self.previous_scan[i], ranges[i])
 
     def get_ranges(self, data):
-        if not self.flag:
-            self.previous_scan = np.array(data.ranges)
-            self.flag = True
-            return [], []
-        else:
-            self.combine_scans(data.ranges)
-            self.flag = False
-            self.previous_scan = None
+        if not self.sim:
+            if not self.flag:
+                self.previous_scan = np.array(data.ranges)
+                self.flag = True
+                return [], []
+            else:
+                self.combine_scans(data.ranges)
+                self.flag = False
+                self.previous_scan = None
 
-        # ranges = self.full_ranges.roll(-self.num_lidar_scans/6) # roll the array to the left to handle lidar offset
-        ranges = np.roll(self.full_ranges, int(self.num_lidar_scans/6)*-1)
+            # ranges = self.full_ranges.roll(-self.num_lidar_scans/6) # roll the array to the left to handle lidar offset
+            ranges = np.roll(self.full_ranges, int(self.num_lidar_scans/6)*-1)
+            ranges = ranges / 2.0
+        else:
+            ranges = self.full_ranges
         return np.array(ranges)
 
     def get_average_pose(self, particles):
@@ -169,7 +173,7 @@ class ParticleFilter:
 
         ranges = self.get_ranges(msg)
         if len(ranges) > 1:
-            rospy.loginfo("Full Lidar data received.")
+            # rospy.loginfo("Full Lidar data received.")
             particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
             particle_likelihoods = particle_likelihoods / np.sum(particle_likelihoods) # Normalize to sum to 1
 
