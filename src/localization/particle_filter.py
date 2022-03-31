@@ -75,6 +75,7 @@ class ParticleFilter:
 
         # Testing publishers
         self.actual_positions_pub = rospy.Publisher("actual_position", Vector3, queue_size=10)
+        self.pred_positions_pub = rospy.Publisher("predicted_position", Vector3, queue_size=10)
         self.tf = TransformListener()
 
         # Initialize the models
@@ -134,23 +135,6 @@ class ParticleFilter:
         x_bar, y_bar = avg[0], avg[1]
         theta_bar = np.arctan2(avg[2], avg[3])
 
-        # if self.sim and self.testing:
-        #     try:
-        #         t = self.tf.getLatestCommonTime("map", "base_link")
-        #         position, quaternion = self.tf.lookupTransform("map", "base_link", t)
-        #         actual = Vector3()
-        #         actual.x = position[0]
-        #         actual.y = position[1]
-        #         actual.z = position[2]
-        #         self.actual_positions_pub.publish(actual)
-        #         predicted = Vector3()
-        #         predicted.x = x_bar
-        #         predicted.y = y_bar
-        #         predicted.z = 0
-        #         self.pred_positions_pub.publish(predicted)
-        #     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException, rospy.exceptions.ROSTimeMovedBackwardsException):
-        #         rospy.loginfo("Could not get positions")
-
         return x_bar, y_bar, theta_bar
 
     def lidar_callback(self, msg):
@@ -204,9 +188,10 @@ class ParticleFilter:
 
         # Determine the "average" particle pose
         avg_pose = self.get_average_pose(self.particles)
-        self.pub_point_cloud()
+        # self.pub_point_cloud()
         self.estimated_pose = avg_pose
-        self.pub_pose_estimation(avg_pose)
+        # self.pub_pose_estimation(avg_pose)
+        self.send_error_msg(avg_pose)
 
         # Publish this "average" pose as a transform between the map and the car's expected base_link
         # self.publish_pose(avg_pose)
@@ -230,6 +215,9 @@ class ParticleFilter:
 
     def initialpose_callback(self, msg):
         """ Initialize particle positions based on an initial pose estimate. """
+        rospy.loginfo("set initial pose")
+        self.marker_arr.markers = []
+        self.estimation_publisher.publish(self.marker_arr)
         x = msg.pose.pose.position.x
         y = msg.pose.pose.position.y
         q = msg.pose.pose.orientation
@@ -261,7 +249,7 @@ class ParticleFilter:
         estimation = Marker()
         estimation.header.frame_id = "/map"
         estimation.header.stamp = rospy.Time.now()
-        estimation.ns = "estimation_marker"
+        estimation.ns = "estimation_marker" + str(rospy.Time.now())
         estimation.id = 0
         estimation.type = estimation.ARROW
         estimation.action = estimation.ADD
@@ -275,12 +263,10 @@ class ParticleFilter:
         estimation.points[1].y = np.sin(avg_pose[2]) + avg_pose[1]
         estimation.points[1].z = 0
         estimation.color.a = 1.0
-        estimation.color.g = 1.0
+        estimation.color.r = 1.0
         estimation.scale.x = .2
         estimation.scale.y = .2
         self.marker_arr.markers.append(estimation)
-        if len(self.marker_arr.markers) > 1:
-            self.marker_arr.markers.pop(0)
         self.estimation_publisher.publish(self.marker_arr)
 
     def create_ackermann_msg(self, steering_angle):
@@ -293,6 +279,25 @@ class ParticleFilter:
         msg.drive.acceleration = 0.5
         msg.drive.jerk = 0.0
         return msg
+
+    def send_error_msg(self, avg_pose):
+        if self.sim and self.testing:
+            try:
+                t = self.tf.getLatestCommonTime("map", "base_link")
+                position, quaternion = self.tf.lookupTransform("map", "base_link", t)
+                theta = transformations.euler_from_quaternion(quaternion)[-1]
+                actual = Vector3()
+                actual.x = position[0]
+                actual.y = position[1]
+                actual.z = theta
+                self.actual_positions_pub.publish(actual)
+                predicted = Vector3()
+                predicted.x = avg_pose[0]
+                predicted.y = avg_pose[1]
+                predicted.z = avg_pose[2]
+                self.pred_positions_pub.publish(predicted)
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException, rospy.exceptions.ROSTimeMovedBackwardsException):
+                rospy.loginfo("Could not get positions")
 
 if __name__ == "__main__":
     rospy.init_node("particle_filter")
