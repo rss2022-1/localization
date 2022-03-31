@@ -22,8 +22,8 @@ class ParticleFilter:
         # Initialize class variables
         self.map_initialized = False
         self.last_update = None
-        self.sim = True
-        self.testing = True
+        self.sim = False
+        self.testing = False
         self.previous_scan = None
         self.flag = False
         self.add_odom_noise = False
@@ -48,7 +48,10 @@ class ParticleFilter:
         #     a twist component, you will only be provided with the
         #     twist component, so you should rely only on that
         #     information, and *not* use the pose component.
-        scan_topic = rospy.get_param("~scan_topic", "/scan")
+        if self.sim:
+            scan_topic = "/scan_sim"
+        else:
+            scan_topic = rospy.get_param("~scan_topic", "/scan")
         odom_topic = rospy.get_param("~odom_topic", "/odom")
         self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_callback, queue_size=1)
         self.odom_sub  = rospy.Subscriber(odom_topic, Odometry, self.odom_callback, queue_size=1)
@@ -107,7 +110,7 @@ class ParticleFilter:
             if not self.flag:
                 self.previous_scan = np.array(data.ranges)
                 self.flag = True
-                return [], []
+                return []
             else:
                 self.combine_scans(data.ranges)
                 self.flag = False
@@ -142,7 +145,6 @@ class ParticleFilter:
         # Takes in lidar data and calls sensor_model to get particle likelihoods
         if not self.initialized and not self.map_initialized:
             return
-
         ranges = self.get_ranges(msg)
         if len(ranges) > 1:
             particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
@@ -155,7 +157,8 @@ class ParticleFilter:
                 self.particles = sampled_particles
 
                 # TODO: Uncomment out of sim
-                # self.full_ranges = np.array([-1. for i in range(self.num_lidar_scans)])
+                if not self.sim:
+                    self.full_ranges = np.array([-1. for i in range(self.num_lidar_scans)])
         else:
             # Waiting on lidar data
             pass
@@ -190,8 +193,8 @@ class ParticleFilter:
         avg_pose = self.get_average_pose(self.particles)
         # self.pub_point_cloud()
         self.estimated_pose = avg_pose
-        # self.pub_pose_estimation(avg_pose)
-        self.send_error_msg(avg_pose)
+        self.pub_pose_estimation(avg_pose)
+        # self.send_error_msg(avg_pose)
 
         # Publish this "average" pose as a transform between the map and the car's expected base_link
         # self.publish_pose(avg_pose)

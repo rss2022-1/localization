@@ -124,17 +124,21 @@ class SensorModel:
         if not self.map_set:
             return
 
+        # rospy.loginfo("obs")
+        # rospy.loginfo(observation.shape)
+
         # Convert scan values from meters to pixels and clip values
-        indices = np.arange(0, len(observation), len(observation)//self.num_beams_per_particle).astype(np.uint16)
+        indices = np.arange(0, len(observation), (len(observation)//self.num_beams_per_particle) + 1).astype(np.uint16)
         observation = observation[indices]
 
         stacked_scans = self.scan_sim.scan(particles)
-        stacked_scans = stacked_scans[:,indices]
+
+        # stacked_scans = stacked_scans[:,indices]
         stacked_scans /= float(self.map_resolution * self.lidar_scale_to_map_scale)
         stacked_scans = np.clip(stacked_scans, 0, self.z_max) # clip
         stacked_scans = np.rint(stacked_scans) # discretize
         stacked_scans = stacked_scans.astype(np.uint16)
-        
+
 
         # Convert ground truth scan values from meters to pixels and clip values
         # observation = observation/float(self.map_resolution * self.lidar_scale_to_map_scale)
@@ -142,8 +146,10 @@ class SensorModel:
         observation = np.clip(observation, 0, self.z_max) # clip
         observation = np.rint(observation) # discretize
         observation = observation.astype(np.uint16)
-        
+
+
         particle_likelihoods = np.prod(self.sensor_model_table[observation, stacked_scans], axis=1)
+
         # Scan likelihood given by product of all likelihoods
         # particle_likelihoods = np.ones(len(particles))
         # rospy.loginfo('length of particles: %f', len(particles))
@@ -155,7 +161,7 @@ class SensorModel:
         #         d = observation[j].astype(int) # ground truth
         #         z = int(scan[j])
         #         particle_likelihoods[i] *= self.sensor_model_table[d][z]
-    
+
         return particle_likelihoods**(1.0/2.2)
 
     def map_callback(self, map_msg):
