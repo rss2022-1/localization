@@ -3,15 +3,13 @@ import rospy
 from sensor_model import SensorModel
 from motion_model import MotionModel
 import numpy as np
-# import time
 import threading
-# from sklearn.cluster import DBSCAN
 
 from sensor_msgs.msg import LaserScan, PointCloud
 from nav_msgs.msg import Odometry, OccupancyGrid
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import PoseWithCovarianceStamped
-from geometry_msgs.msg import TwistWithCovarianceStamped, Point32, Point, Vector3
+from geometry_msgs.msg import Point32, Point, Vector3
 from ackermann_msgs.msg import AckermannDriveStamped
 import tf2_ros
 import tf.transformations as transformations
@@ -70,14 +68,13 @@ class ParticleFilter:
         #     "/map" frame.
         self.cloud_topic = rospy.get_param("~cloud_topic", "cloud_map")
         self.estimation_topic = rospy.get_param("~estimation_topic", "/estim_marker")
-        self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
+        self.odom_pub = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
         self.cloud_publisher = rospy.Publisher(self.cloud_topic, PointCloud, queue_size=10)
         self.estimation_publisher = rospy.Publisher(self.estimation_topic, MarkerArray, queue_size=10)
         self.drive_publisher = rospy.Publisher("/vesc/high_level/ackermann_cmd_mux/input/nav_0", AckermannDriveStamped, queue_size=10)
 
         # Testing publishers
         self.actual_positions_pub = rospy.Publisher("actual_position", Vector3, queue_size=10)
-        self.pred_positions_pub = rospy.Publisher("predicted_position", Vector3, queue_size=10)
         self.tf = TransformListener()
 
         # Initialize the models
@@ -114,8 +111,6 @@ class ParticleFilter:
                 self.combine_scans(data.ranges)
                 self.flag = False
                 self.previous_scan = None
-
-            # ranges = self.full_ranges.roll(-self.num_lidar_scans/6) # roll the array to the left to handle lidar offset
             ranges = np.roll(self.full_ranges, int(self.num_lidar_scans/6)*-1)
             ranges = ranges / 2.0
         else:
@@ -133,39 +128,28 @@ class ParticleFilter:
         a very unlikely pose between two modes. What better notions of "average" could you use? """
         # Cluster poses
         # Use sin and cos to avoid circular mean problems
-        poses = np.array([[x, y, np.sin(theta), np.cos(theta)] for x, y, theta in particles])
-        # clusters = DBSCAN(eps=0.05, min_samples=100).fit_predict(poses) # TODO: Tweak the eps and min_samples values based off our data
-        # rospy.loginfo("Number of clusters: %d", len(set(clusters)))
-        # rospy.loginfo("Clusters %s", set(clusters))
-
-        # Get poses in largest cluster
-        # labels, counts = np.unique(clusters, return_counts=True)
-        # largest_cluster_label = np.argmax(counts)
-        # indices = [i for i in range(len(labels)) if clusters[i] == largest_cluster_label]
-        # largest_cluster = poses[indices]
-
-        # Get average of poses in largest cluster
+        poses = np.concatenate((particles[:,:2], np.sin(particles[:,2:]), np.cos(particles[:,2:])), axis=1)
         # Uses arctan2 method for circular mean as seen on Wikipedia
         avg = np.mean(poses, axis=0)
         x_bar, y_bar = avg[0], avg[1]
         theta_bar = np.arctan2(avg[2], avg[3])
 
-        if self.sim and self.testing:
-            try:
-                t = self.tf.getLatestCommonTime("map", "base_link")
-                position, quaternion = self.tf.lookupTransform("map", "base_link", t)
-                actual = Vector3()
-                actual.x = position[0]
-                actual.y = position[1]
-                actual.z = position[2]
-                self.actual_positions_pub.publish(actual)
-                predicted = Vector3()
-                predicted.x = x_bar
-                predicted.y = y_bar
-                predicted.z = 0
-                self.pred_positions_pub.publish(predicted)
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException, rospy.exceptions.ROSTimeMovedBackwardsException):
-                rospy.loginfo("Could not get positions")
+        # if self.sim and self.testing:
+        #     try:
+        #         t = self.tf.getLatestCommonTime("map", "base_link")
+        #         position, quaternion = self.tf.lookupTransform("map", "base_link", t)
+        #         actual = Vector3()
+        #         actual.x = position[0]
+        #         actual.y = position[1]
+        #         actual.z = position[2]
+        #         self.actual_positions_pub.publish(actual)
+        #         predicted = Vector3()
+        #         predicted.x = x_bar
+        #         predicted.y = y_bar
+        #         predicted.z = 0
+        #         self.pred_positions_pub.publish(predicted)
+        #     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException, rospy.exceptions.ROSTimeMovedBackwardsException):
+        #         rospy.loginfo("Could not get positions")
 
         return x_bar, y_bar, theta_bar
 
@@ -177,28 +161,19 @@ class ParticleFilter:
 
         ranges = self.get_ranges(msg)
         if len(ranges) > 1:
-            # rospy.loginfo("Full Lidar data received.")
             particle_likelihoods = self.sensor_model.evaluate(self.particles, ranges)
             particle_likelihoods = particle_likelihoods / np.sum(particle_likelihoods) # Normalize to sum to 1
-            # rospy.loginfo("Particle likelihoods: %s", particle_likelihoods)
+
             # Resample particles based on likelihoods
             sampled_particles_indices = np.random.choice(len(self.particles), self.num_particles, p=particle_likelihoods)
-            # rospy.loginfo(sampled_particles_indices)
             sampled_particles = self.particles[sampled_particles_indices]
-            # rospy.loginfo("Resampled particles.")
             with self.lock:
                 self.particles = sampled_particles
 
-                # Publish the "average" pose as a transform between the map and the car's expected base_link
-                # avg_pose = self.get_average_pose(sampled_particles)
-                # self.pub_point_cloud()
-                # self.estimated_pose = avg_pose
-                # self.pub_pose_estimation(avg_pose)
-                # self.publish_pose(avg_pose)
                 # TODO: Uncomment out of sim
                 # self.full_ranges = np.array([-1. for i in range(self.num_lidar_scans)])
         else:
-            # rospy.loginfo("Waiting on full lidar data...")
+            # Waiting on lidar data
             pass
 
     def odom_callback(self, msg):
@@ -221,7 +196,6 @@ class ParticleFilter:
         #   Use a Set dt to find dx, dy, and dtheta
         curr_time = rospy.get_time()
         dt = curr_time - self.last_update
-        # dt = 1/20.
         self.last_update = curr_time
         odom = np.array([vx*dt, vy*dt, vtheta*dt])
         propogated_particles = self.motion_model.evaluate(self.particles, odom)
@@ -235,7 +209,7 @@ class ParticleFilter:
         self.pub_pose_estimation(avg_pose)
 
         # Publish this "average" pose as a transform between the map and the car's expected base_link
-        self.publish_pose(avg_pose)
+        # self.publish_pose(avg_pose)
 
     def publish_pose(self, avg_pose):
         """ Publish a transform between the map and the base_link frome of the given pose. """
@@ -265,7 +239,6 @@ class ParticleFilter:
         with self.lock:
             self.particles[:, 0] = x + np.random.normal(0, base_noise, self.num_particles)
             self.particles[:, 1] = y + np.random.normal(0, base_noise, self.num_particles)
-            # self.particles[:, 2] = np.random.uniform(-np.pi, np.pi, self.num_particles)
             self.particles[:, 2] = theta# + np.random.uniform(-np.pi/12., np.pi/12., self.num_particles)
 
         # self.last_update = rospy.get_time()
