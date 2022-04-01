@@ -35,7 +35,6 @@ class SensorModel:
         # Precompute the sensor model table
         self.sensor_model_table = np.zeros((self.table_width, self.table_width))
         self.precompute_sensor_model()
-
         # Create a simulated laser scan
         self.scan_sim = PyScanSimulator2D(
                 self.num_beams_per_particle,
@@ -124,16 +123,22 @@ class SensorModel:
         if not self.map_set:
             return
 
-        # rospy.loginfo("obs")
-        # rospy.loginfo(observation.shape)
+        #rospy.loginfo("obs")
+        #rospy.loginfo(observation.shape)
+        #rospy.loginfo(particles.shape)
 
         # Convert scan values from meters to pixels and clip values
-        indices = np.arange(0, len(observation), (len(observation)//self.num_beams_per_particle) + 1).astype(np.uint16)
+        indices = np.arange(0, len(observation), (len(observation)//self.num_beams_per_particle)+1).astype(np.uint16)
+        
         observation = observation[indices]
+        #rospy.loginfo(indices.shape)
+        #rospy.loginfo(observation.shape)
 
         stacked_scans = self.scan_sim.scan(particles)
-
-        # stacked_scans = stacked_scans[:,indices]
+        #rospy.loginfo(stacked_scans.shape)
+        #stacked_scans = np.delete(observation, -1, axis=0)
+        #stacked_scans = stacked_scans[:,indices]
+        #rospy.loginfo(stacked_scans.shape)
         stacked_scans /= float(self.map_resolution * self.lidar_scale_to_map_scale)
         stacked_scans = np.clip(stacked_scans, 0, self.z_max) # clip
         stacked_scans = np.rint(stacked_scans) # discretize
