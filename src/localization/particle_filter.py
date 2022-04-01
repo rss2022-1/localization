@@ -76,6 +76,7 @@ class ParticleFilter:
         self.cloud_publisher = rospy.Publisher(self.cloud_topic, PointCloud, queue_size=10)
         self.estimation_publisher = rospy.Publisher(self.estimation_topic, MarkerArray, queue_size=10)
         self.drive_publisher = rospy.Publisher("/vesc/high_level/ackermann_cmd_mux/input/nav_0", AckermannDriveStamped, queue_size=10)
+        self.single = rospy.Publisher("/estim_marker", Marker, queue_size=10)
 
         # Testing publishers
         self.actual_positions_pub = rospy.Publisher("actual_position", Vector3, queue_size=10)
@@ -117,6 +118,7 @@ class ParticleFilter:
                 self.flag = False
                 self.previous_scan = None
             ranges = np.roll(self.full_ranges, int(self.num_lidar_scans/6)*-1)
+            #ranges = self.full_ranges
             ranges = ranges / 2.0
         else:
             self.full_ranges = data.ranges
@@ -194,7 +196,8 @@ class ParticleFilter:
         avg_pose = self.get_average_pose(self.particles)
         self.pub_point_cloud()
         self.estimated_pose = avg_pose
-        #self.pub_pose_estimation(avg_pose)
+        self.pub_pose_estimation(avg_pose)
+        #rospy.loginfo(avg_pose)
         # self.send_error_msg(avg_pose)
 
         # Publish this "average" pose as a transform between the map and the car's expected base_link
@@ -253,7 +256,8 @@ class ParticleFilter:
         estimation = Marker()
         estimation.header.frame_id = "/laser"
         estimation.header.stamp = rospy.Time.now()
-        estimation.ns = "estimation_marker" + str(rospy.Time.now())
+        estimation.ns = "estimation_marker"
+        #estimation.ns = "estimation_marker" + str(rospy.Time.now())
         estimation.id = 0
         estimation.type = estimation.ARROW
         estimation.action = estimation.ADD
@@ -270,10 +274,11 @@ class ParticleFilter:
         estimation.color.r = 1.0
         estimation.scale.x = .2
         estimation.scale.y = .2
-        if len(self.marker_arr.markers) > 0:
-            self.marker_arr.markers = []
-        self.marker_arr.markers.append(estimation)
-        self.estimation_publisher.publish(self.marker_arr)
+        #if len(self.marker_arr.markers) > 0:
+        #    self.marker_arr.markers = []
+        #self.marker_arr.markers.append(estimation)
+        #self.estimation_publisher.publish(self.marker_arr)
+        self.single.publish(estimation)
 
     def create_ackermann_msg(self, steering_angle):
         msg = AckermannDriveStamped()

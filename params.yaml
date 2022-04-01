@@ -28,4 +28,4 @@ deterministic: false
 lidar_scale_to_map_scale: 1.0
 
 cloud_topic: "/cloud_map"
-estimation_topic: "/estim_marker"
+estimation_topic: "/estim_markers"

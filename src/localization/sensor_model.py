@@ -128,15 +128,17 @@ class SensorModel:
         #rospy.loginfo(particles.shape)
 
         # Convert scan values from meters to pixels and clip values
+        #for i in range(3):
+        #    observation = np.append(observation, 0)
+        #rospy.loginfo(observation.shape)
         indices = np.arange(0, len(observation), (len(observation)//self.num_beams_per_particle)+1).astype(np.uint16)
-        
+        #indices = np.rint(np.linspace(0, len(observation)-1, num=self.num_beams_per_particle)).astype(np.uint16)
         observation = observation[indices]
         #rospy.loginfo(indices.shape)
         #rospy.loginfo(observation.shape)
 
         stacked_scans = self.scan_sim.scan(particles)
         #rospy.loginfo(stacked_scans.shape)
-        #stacked_scans = np.delete(observation, -1, axis=0)
         #stacked_scans = stacked_scans[:,indices]
         #rospy.loginfo(stacked_scans.shape)
         stacked_scans /= float(self.map_resolution * self.lidar_scale_to_map_scale)

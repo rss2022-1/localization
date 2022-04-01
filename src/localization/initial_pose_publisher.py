@@ -9,14 +9,14 @@ def simple_publisher():
     rospy.init_node('simple_publisher', anonymous=True)
     initial = PoseWithCovarianceStamped()
     initial.header.stamp = rospy.Time.now()
-    initial.header.frame_id = "/map"
-    initial.pose.pose.position.x = 0
-    initial.pose.pose.position.y = 0
+    initial.header.frame_id = "/laser"
+    initial.pose.pose.position.x = 1.25
+    initial.pose.pose.position.y = 1.575
     initial.pose.pose.position.z = 0
     initial.pose.pose.orientation.x = 0
     initial.pose.pose.orientation.y = 0
     initial.pose.pose.orientation.z = 1
-    initial.pose.pose.orientation.w = math.pi/3.
+    initial.pose.pose.orientation.w = 0
     pub.publish(initial)
     rospy.loginfo("Initial Pose Sent!")
 
