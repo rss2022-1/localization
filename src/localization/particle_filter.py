@@ -192,9 +192,9 @@ class ParticleFilter:
 
         # Determine the "average" particle pose
         avg_pose = self.get_average_pose(self.particles)
-        # self.pub_point_cloud()
+        self.pub_point_cloud()
         self.estimated_pose = avg_pose
-        self.pub_pose_estimation(avg_pose)
+        #self.pub_pose_estimation(avg_pose)
         # self.send_error_msg(avg_pose)
 
         # Publish this "average" pose as a transform between the map and the car's expected base_link
@@ -239,9 +239,9 @@ class ParticleFilter:
     def pub_point_cloud(self):
         ''' Publishes the point cloud of the particles '''
         cloud = PointCloud()
-        cloud.header.frame_id = "/map"
-        cloud.points = [Point32() for i in range(10)]
-        for i in range(10):
+        cloud.header.frame_id = "/laser"
+        cloud.points = [Point32() for i in range(self.num_particles)]
+        for i in range(self.num_particles):
             cloud.points[i].x = self.particles[i, 0]
             cloud.points[i].y = self.particles[i, 1]
             cloud.points[i].z = 0
@@ -251,7 +251,7 @@ class ParticleFilter:
     def pub_pose_estimation(self, avg_pose):
         ''' Publishes the current estimated pose of the car '''
         estimation = Marker()
-        estimation.header.frame_id = "/map"
+        estimation.header.frame_id = "/laser"
         estimation.header.stamp = rospy.Time.now()
         estimation.ns = "estimation_marker" + str(rospy.Time.now())
         estimation.id = 0
@@ -270,6 +270,8 @@ class ParticleFilter:
         estimation.color.r = 1.0
         estimation.scale.x = .2
         estimation.scale.y = .2
+        if len(self.marker_arr.markers) > 0:
+            self.marker_arr.markers = []
         self.marker_arr.markers.append(estimation)
         self.estimation_publisher.publish(self.marker_arr)
 

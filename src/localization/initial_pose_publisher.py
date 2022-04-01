@@ -16,7 +16,7 @@ def simple_publisher():
     initial.pose.pose.orientation.x = 0
     initial.pose.pose.orientation.y = 0
     initial.pose.pose.orientation.z = 1
-    initial.pose.pose.orientation.w = math.pi/4.
+    initial.pose.pose.orientation.w = math.pi/3.
     pub.publish(initial)
     rospy.loginfo("Initial Pose Sent!")
 
