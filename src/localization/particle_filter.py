@@ -117,9 +117,9 @@ class ParticleFilter:
                 self.combine_scans(data.ranges)
                 self.flag = False
                 self.previous_scan = None
-                ranges = np.roll(self.full_ranges, 1*int(self.num_lidar_scans/6))
+                ranges = np.roll(self.full_ranges, -1*int(self.num_lidar_scans/6))
                 #ranges = self.full_ranges
-                #ranges = ranges / 2.0
+                ranges = ranges / 2.0
         else:
             self.full_ranges = data.ranges
             ranges = self.full_ranges
@@ -242,7 +242,7 @@ class ParticleFilter:
     def pub_point_cloud(self):
         ''' Publishes the point cloud of the particles '''
         cloud = PointCloud()
-        cloud.header.frame_id = "/laser"
+        cloud.header.frame_id = "/map"
         cloud.points = [Point32() for i in range(self.num_particles)]
         for i in range(self.num_particles):
             cloud.points[i].x = self.particles[i, 0]
@@ -254,7 +254,7 @@ class ParticleFilter:
     def pub_pose_estimation(self, avg_pose):
         ''' Publishes the current estimated pose of the car '''
         estimation = Marker()
-        estimation.header.frame_id = "/laser"
+        estimation.header.frame_id = "/map"
         estimation.header.stamp = rospy.Time.now()
         estimation.ns = "estimation_marker"
         #estimation.ns = "estimation_marker" + str(rospy.Time.now())
