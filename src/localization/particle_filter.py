@@ -22,11 +22,9 @@ class ParticleFilter:
         # Initialize class variables
         self.map_initialized = False
         self.last_update = None
-        self.sim = False
-        self.testing = False
+        self.sim = True
         self.previous_scan = None
         self.flag = False
-        self.add_odom_noise = False
         self.marker_arr = MarkerArray()
         self.num_lidar_scans = 100 if self.sim else 897
         self.full_ranges = np.array([-1. for i in range(self.num_lidar_scans)])
@@ -49,7 +47,7 @@ class ParticleFilter:
         #     twist component, so you should rely only on that
         #     information, and *not* use the pose component.
         if self.sim:
-            scan_topic = "/scan_sim"
+            scan_topic = "/scan"
         else:
             scan_topic = rospy.get_param("~scan_topic", "/scan")
         odom_topic = rospy.get_param("~odom_topic", "/odom")
@@ -76,11 +74,10 @@ class ParticleFilter:
         self.cloud_publisher = rospy.Publisher(self.cloud_topic, PointCloud, queue_size=10)
         self.estimation_publisher = rospy.Publisher(self.estimation_topic, MarkerArray, queue_size=10)
         self.drive_publisher = rospy.Publisher("/vesc/high_level/ackermann_cmd_mux/input/nav_0", AckermannDriveStamped, queue_size=10)
-        self.single = rospy.Publisher("/estim_marker", Marker, queue_size=10)
+        self.single_marker_pub = rospy.Publisher("/estim_marker", Marker, queue_size=10)
 
         # Testing publishers
-        self.actual_positions_pub = rospy.Publisher("actual_position", Vector3, queue_size=10)
-        self.pred_positions_pub = rospy.Publisher("predicted_position", Vector3, queue_size=10)
+        self.error_pub = rospy.Publisher("/localization_error", Vector3, queue_size=10)
         self.tf = TransformListener()
 
         # Initialize the models
@@ -118,7 +115,6 @@ class ParticleFilter:
                 self.flag = False
                 self.previous_scan = None
                 ranges = np.roll(self.full_ranges, -1*int(self.num_lidar_scans/6))
-                #ranges = self.full_ranges
                 ranges = ranges / 2.0
         else:
             self.full_ranges = data.ranges
@@ -178,10 +174,6 @@ class ParticleFilter:
         vx = msg.twist.twist.linear.x
         vy = msg.twist.twist.linear.y
         vtheta = msg.twist.twist.angular.z
-        if self.add_odom_noise:
-            vx += np.random.normal(0, abs(vx/10.))
-            vy += np.random.normal(0, abs(vy/10.))
-            vtheta += np.random.normal(0, abs(vtheta/10.))
 
         #   Use a Set dt to find dx, dy, and dtheta
         curr_time = rospy.get_time()
@@ -195,13 +187,11 @@ class ParticleFilter:
         # Determine the "average" particle pose
         avg_pose = self.get_average_pose(self.particles)
         self.pub_point_cloud()
-        self.estimated_pose = avg_pose
         self.pub_pose_estimation(avg_pose)
-        #rospy.loginfo(avg_pose)
-        # self.send_error_msg(avg_pose)
+        #self.send_error_msg(avg_pose)
 
         # Publish this "average" pose as a transform between the map and the car's expected base_link
-        # self.publish_pose(avg_pose)
+        self.publish_pose(avg_pose)
 
     def publish_pose(self, avg_pose):
         """ Publish a transform between the map and the base_link frome of the given pose. """
@@ -243,8 +233,8 @@ class ParticleFilter:
         ''' Publishes the point cloud of the particles '''
         cloud = PointCloud()
         cloud.header.frame_id = "/map"
-        cloud.points = [Point32() for i in range(self.num_particles)]
-        for i in range(self.num_particles):
+        cloud.points = [Point32() for i in range(10)]
+        for i in range(10):
             cloud.points[i].x = self.particles[i, 0]
             cloud.points[i].y = self.particles[i, 1]
             cloud.points[i].z = 0
@@ -278,7 +268,7 @@ class ParticleFilter:
         #    self.marker_arr.markers = []
         #self.marker_arr.markers.append(estimation)
         #self.estimation_publisher.publish(self.marker_arr)
-        self.single.publish(estimation)
+        self.single_marker_pub.publish(estimation)
 
     def create_ackermann_msg(self, steering_angle):
         msg = AckermannDriveStamped()
@@ -292,23 +282,17 @@ class ParticleFilter:
         return msg
 
     def send_error_msg(self, avg_pose):
-        if self.sim and self.testing:
-            try:
-                t = self.tf.getLatestCommonTime("map", "base_link")
-                position, quaternion = self.tf.lookupTransform("map", "base_link", t)
-                theta = transformations.euler_from_quaternion(quaternion)[-1]
-                actual = Vector3()
-                actual.x = position[0]
-                actual.y = position[1]
-                actual.z = theta
-                self.actual_positions_pub.publish(actual)
-                predicted = Vector3()
-                predicted.x = avg_pose[0]
-                predicted.y = avg_pose[1]
-                predicted.z = avg_pose[2]
-                self.pred_positions_pub.publish(predicted)
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException, rospy.exceptions.ROSTimeMovedBackwardsException):
-                rospy.loginfo("Could not get positions")
+        try:
+            t = self.tf.getLatestCommonTime("map", "laser")
+            position, quaternion = self.tf.lookupTransform("map", "laser", t)
+            theta = transformations.euler_from_quaternion(quaternion)[-1]
+            actual = Vector3()
+            actual.x = position[0] - avg_pose[0]
+            actual.y = position[1] - avg_pose[1]
+            actual.z = theta - avg_pose[2]
+            self.error_pub.publish(actual)
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException, rospy.exceptions.ROSTimeMovedBackwardsException):
+            rospy.loginfo("Could not get positions")
 
 if __name__ == "__main__":
     rospy.init_node("particle_filter")

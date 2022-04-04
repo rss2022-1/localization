@@ -123,24 +123,11 @@ class SensorModel:
         if not self.map_set:
             return
 
-        #rospy.loginfo("obs")
-        #rospy.loginfo(observation.shape)
-        #rospy.loginfo(particles.shape)
-
         # Convert scan values from meters to pixels and clip values
-        #for i in range(3):
-        #    observation = np.append(observation, 0)
-        #rospy.loginfo(observation.shape)
-        indices = np.arange(0, len(observation), (len(observation)//self.num_beams_per_particle)+1).astype(np.uint16)
-        #indices = np.rint(np.linspace(0, len(observation)-1, num=self.num_beams_per_particle)).astype(np.uint16)
+        indices = np.arange(0, len(observation), (len(observation)//self.num_beams_per_particle)).astype(np.uint16)
         observation = observation[indices]
-        #rospy.loginfo(indices.shape)
-        #rospy.loginfo(observation.shape)
 
         stacked_scans = self.scan_sim.scan(particles)
-        #rospy.loginfo(stacked_scans.shape)
-        #stacked_scans = stacked_scans[:,indices]
-        #rospy.loginfo(stacked_scans.shape)
         stacked_scans /= float(self.map_resolution * self.lidar_scale_to_map_scale)
         stacked_scans = np.clip(stacked_scans, 0, self.z_max) # clip
         stacked_scans = np.rint(stacked_scans) # discretize
@@ -148,7 +135,6 @@ class SensorModel:
 
 
         # Convert ground truth scan values from meters to pixels and clip values
-        # observation = observation/float(self.map_resolution * self.lidar_scale_to_map_scale)
         observation = np.divide(observation, float(self.map_resolution * self.lidar_scale_to_map_scale))
         observation = np.clip(observation, 0, self.z_max) # clip
         observation = np.rint(observation) # discretize
