@@ -117,9 +117,9 @@ class ParticleFilter:
                 self.combine_scans(data.ranges)
                 self.flag = False
                 self.previous_scan = None
-            ranges = np.roll(self.full_ranges, int(self.num_lidar_scans/6)*-1)
-            #ranges = self.full_ranges
-            ranges = ranges / 2.0
+                ranges = np.roll(self.full_ranges, 1*int(self.num_lidar_scans/6))
+                #ranges = self.full_ranges
+                #ranges = ranges / 2.0
         else:
             self.full_ranges = data.ranges
             ranges = self.full_ranges
