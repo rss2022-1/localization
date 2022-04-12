@@ -186,8 +186,8 @@ class ParticleFilter:
 
         # Determine the "average" particle pose
         avg_pose = self.get_average_pose(self.particles)
-        self.pub_point_cloud()
-        self.pub_pose_estimation(avg_pose)
+        # self.pub_point_cloud()
+        # self.pub_pose_estimation(avg_pose)
         #self.send_error_msg(avg_pose)
 
         # Publish this "average" pose as a transform between the map and the car's expected base_link
