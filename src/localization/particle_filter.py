@@ -204,8 +204,8 @@ class ParticleFilter:
         odom.pose.pose.position.z = 0
         odom.pose.pose.orientation.x = 0
         odom.pose.pose.orientation.y = 0
-        odom.pose.pose.orientation.z = 1
-        odom.pose.pose.orientation.w = avg_pose[2]
+        odom.pose.pose.orientation.z = np.sin(avg_pose[2]/2)
+        odom.pose.pose.orientation.w = np.cos(avg_pose[2]/2)
 
         # create covariance matrix somehow
         self.odom_pub.publish(odom)
