@@ -220,8 +220,16 @@ class ParticleFilter:
         odom.pose.pose.orientation.z = 1
         odom.pose.pose.orientation.w = avg_pose[2]
 
-        self.pub_tf.sendTransform((avg_pose[0],avg_pose[1],0),transformations.quaternion_from_euler(0, 0, avg_pose[2]), 
-               rospy.Time.now() , self.particle_filter_frame, "/map")
+        # Get map -> laser transform.
+        map_laser_pos = np.array( (avg_pose[0],avg_pose[1],0) )
+        map_laser_rotation = np.array(transformations.quaternion_from_euler(0, 0, avg_pose[2]) )
+        # Apply laser -> base_link transform to map -> laser transform
+        # This gives a map -> base_link transform
+        laser_base_link_offset = (0.265, 0, 0)
+        map_laser_pos -= np.dot(transformations.quaternion_matrix(transformations.unit_vector(map_laser_rotation))[:3,:3], laser_base_link_offset).T
+
+        # Publish transform
+        self.pub_tf.sendTransform(map_laser_pos, map_laser_rotation, rospy.Time.now(), self.particle_filter_frame, "/map")
 
         # create covariance matrix somehow
         self.odom_pub.publish(odom)
