@@ -13,7 +13,8 @@ from geometry_msgs.msg import Point32, Point, Vector3
 from ackermann_msgs.msg import AckermannDriveStamped
 import tf2_ros
 import tf.transformations as transformations
-from tf import TransformListener
+# from tf import TransformListener
+import tf
 
 
 class ParticleFilter:
@@ -77,6 +78,8 @@ class ParticleFilter:
         self.estimation_publisher = rospy.Publisher(self.estimation_topic, MarkerArray, queue_size=10)
         self.drive_publisher = rospy.Publisher("/vesc/high_level/ackermann_cmd_mux/input/nav_0", AckermannDriveStamped, queue_size=10)
         self.single = rospy.Publisher("/estim_marker", Marker, queue_size=10)
+
+        self.pub_tf = tf.TransformBroadcaster()
 
         # Testing publishers
         self.actual_positions_pub = rospy.Publisher("actual_position", Vector3, queue_size=10)
@@ -216,6 +219,9 @@ class ParticleFilter:
         odom.pose.pose.orientation.y = 0
         odom.pose.pose.orientation.z = 1
         odom.pose.pose.orientation.w = avg_pose[2]
+
+        self.pub_tf.sendTransform((avg_pose[0],avg_pose[1],0),tf.transformations.quaternion_from_euler(0, 0, avg_pose[2]), 
+               rospy.Time.now() , self.particle_filter_frame, "/map")
 
         # create covariance matrix somehow
         self.odom_pub.publish(odom)
